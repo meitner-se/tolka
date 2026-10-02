@@ -8,8 +8,18 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
+    # Nothing publishes unless the checks passed on this exact commit. The
+    # release job runs on a push to main, where the pull_request checks do not.
+    test:
+        uses: ./.github/workflows/test.yaml
+    lint:
+        uses: ./.github/workflows/lint.yaml
+    typecheck:
+        uses: ./.github/workflows/typecheck.yaml
+
     release:
         name: Release
+        needs: [test, lint, typecheck]
         runs-on: ubuntu-latest
         permissions:
             id-token: write

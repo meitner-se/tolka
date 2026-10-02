@@ -6,7 +6,13 @@
     "arrowParens": "always",
     "printWidth": 80,
     "sortPackageJson": false,
-    "ignorePatterns": ["*.yaml", "src/vendor/**", "coverage/**", "dist/**"],
+    "ignorePatterns": [
+        "CHANGELOG.md",
+        "*.yaml",
+        "src/vendor/**",
+        "coverage/**",
+        "dist/**"
+    ],
     "sortImports": {
         "groups": [
             "type-import",
