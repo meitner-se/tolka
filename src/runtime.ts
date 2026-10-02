@@ -17,6 +17,7 @@ import type {
     Resolved,
     StateFromPlugins,
     Tagged,
+    TaggedStates,
     TagsUsed,
 } from "./types.js";
 
@@ -104,11 +105,27 @@ export interface Tolka<
 }
 
 /**
- * Returns the literal shape rather than the `Plugin` interface, so whether a
- * `defaultAxisValue` was declared survives into `StateFromPlugins`.
+ * The authoring helper a plugin hands to content files, so they never write the
+ * `__tag` marker by hand.
  */
-export function definePlugin<const P extends AnyPlugin>(plugin: P): P {
-    return plugin;
+export type PluginCreate<Tag extends string> = <
+    const States extends TaggedStates,
+>(
+    states: States
+) => Tagged<Tag, States>;
+
+/**
+ * Returns the literal shape rather than the `Plugin` interface, so whether a
+ * `defaultAxisValue` was declared survives into `StateFromPlugins`, plus a
+ * synthesised `create` so every plugin need not write the same two lines.
+ */
+export function definePlugin<const P extends AnyPlugin>(
+    plugin: P
+): P & { create: PluginCreate<P["tag"]> } {
+    return {
+        ...plugin,
+        create: (states) => ({ __tag: plugin.tag, states }),
+    };
 }
 
 function isDev(): boolean {
@@ -240,6 +257,10 @@ export function createTolka<
                 new Error(`no plugin registered for tag "${leaf.__tag}"`),
                 info
             );
+            // `TaggedStates` requires a `default`, but this branch is only
+            // reached for a tag no plugin handles, which in practice means the
+            // value came from outside the type system. A test covers it.
+            // oxlint-disable-next-line typescript/no-unnecessary-condition -- see above
             return leaf.states["default"] ?? "";
         }
         const axis =

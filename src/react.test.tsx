@@ -13,8 +13,10 @@ type Tone = "formal" | "casual";
 const tonePlugin = definePlugin({
     tag: "tone",
     resolve: (value: Tagged<"tone">, axis: Tone) =>
-        value.states[axis] ?? value.states["default"] ?? "",
+        value.states[axis] ?? value.states.default,
 });
+
+const tone = tonePlugin.create;
 
 const tolka = createTolka({
     locales: ["sv", "en"] as const,
@@ -28,10 +30,7 @@ const { DictionaryProvider, useDictionary } = createReactBindings(tolka);
 const dictionary = tolka.createDictionary({
     content: {
         title: {
-            sv: {
-                __tag: "tone",
-                states: { default: "Filer", formal: "Dokument" },
-            },
+            sv: tone({ default: "Filer", formal: "Dokument" }),
             en: "Files",
         },
         rich: {
@@ -46,9 +45,9 @@ function bold(chunks: ReactNode): ReactNode {
     return <strong>{chunks}</strong>;
 }
 
-function render(tree: ReactNode, locale: "sv" | "en", tone: Tone): string {
+function render(tree: ReactNode, locale: "sv" | "en", axis: Tone): string {
     return renderToStaticMarkup(
-        <DictionaryProvider locale={locale} state={{ tone }}>
+        <DictionaryProvider locale={locale} state={{ tone: axis }}>
             {tree}
         </DictionaryProvider>
     );

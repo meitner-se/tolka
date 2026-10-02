@@ -10,7 +10,8 @@ import { definePlugin } from "../src/index.js";
 
 definePlugin({
     tag: "ok",
-    resolve: (value: Tagged<"ok">, axis: string) => value.states[axis] ?? "",
+    resolve: (value: Tagged<"ok">, axis: string) =>
+        value.states[axis] ?? value.states.default,
 });
 
 definePlugin({

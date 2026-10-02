@@ -11,8 +11,10 @@ type Tone = "formal" | "casual" | "terse";
 const tonePlugin = definePlugin({
     tag: "tone",
     resolve: (value: Tagged<"tone">, axis: Tone) =>
-        value.states[axis] ?? value.states["default"] ?? "",
+        value.states[axis] ?? value.states.default,
 });
+
+const tone = tonePlugin.create;
 
 function setup(onError?: (error: unknown, info: unknown) => void) {
     return createTolka({
@@ -32,15 +34,12 @@ describe("plugin resolution and ICU compose", () => {
     const dictionary = tolka.createDictionary({
         content: {
             enrolled: {
-                sv: {
-                    __tag: "tone",
-                    states: {
-                        default:
-                            "{count, plural, one {# fil} other {# filer}} är sparade",
-                        formal: "{count, plural, one {# dokument} other {# dokument}} är sparade",
-                        terse: "{count, plural, one {# post} other {# poster}} är sparade",
-                    },
-                },
+                sv: tone({
+                    default:
+                        "{count, plural, one {# fil} other {# filer}} är sparade",
+                    formal: "{count, plural, one {# dokument} other {# dokument}} är sparade",
+                    terse: "{count, plural, one {# post} other {# poster}} är sparade",
+                }),
                 en: "{count, plural, one {# file} other {# files}} saved",
             },
         },
@@ -50,10 +49,10 @@ describe("plugin resolution and ICU compose", () => {
         ["formal", "1 dokument är sparade", "4 dokument är sparade"],
         ["casual", "1 fil är sparade", "4 filer är sparade"],
         ["terse", "1 post är sparade", "4 poster är sparade"],
-    ])("resolves %s through plugin then ICU", (tone, one, many) => {
+    ])("resolves %s through plugin then ICU", (axis, one, many) => {
         const { content } = tolka.resolveDictionary(dictionary, {
             locale: "sv",
-            state: { tone: tone as Tone },
+            state: { tone: axis as Tone },
         });
         expect(call(content.enrolled, { count: 1 })).toBe(one);
         expect(call(content.enrolled, { count: 4 })).toBe(many);
@@ -104,18 +103,15 @@ describe("resolution outside React", () => {
         const dictionary = tolka.createDictionary({
             content: {
                 title: {
-                    sv: {
-                        __tag: "tone",
-                        states: { default: "Filer", formal: "Dokument" },
-                    },
+                    sv: tone({ default: "Filer", formal: "Dokument" }),
                     en: "Files",
                 },
             },
         });
-        const title = (locale: "sv" | "en", tone: Tone) =>
+        const title = (locale: "sv" | "en", axis: Tone) =>
             tolka.resolveDictionary(dictionary, {
                 locale,
-                state: { tone },
+                state: { tone: axis },
             }).content["title"];
 
         expect(title("sv", "casual")).toBe("Filer");
@@ -324,7 +320,7 @@ describe("degraded paths", () => {
         const foreign = {
             content: {
                 title: {
-                    sv: { __tag: "tone", states: { default: "Filer" } },
+                    sv: tone({ default: "Filer" }),
                 },
             },
         } as never;
@@ -347,6 +343,8 @@ describe("degraded paths", () => {
             plugins: [] as const,
             onError,
         });
+        // Types now require a `default` state, so this degraded shape is
+        // only reachable from untyped data. The runtime must still cope.
         const foreign = {
             content: { title: { sv: { __tag: "tone", states: {} } } },
         } as never;
@@ -398,7 +396,7 @@ describe("a plugin that declares a default axis value", () => {
         const optional = definePlugin({
             tag: "tone",
             resolve: (value: Tagged<"tone">, axis: Tone) =>
-                value.states[axis] ?? value.states["default"] ?? "",
+                value.states[axis] ?? value.states.default,
             defaultAxisValue: "formal" satisfies Tone,
         });
         const tolka = createTolka({
@@ -410,10 +408,7 @@ describe("a plugin that declares a default axis value", () => {
         const dictionary = tolka.createDictionary({
             content: {
                 title: {
-                    sv: {
-                        __tag: "tone",
-                        states: { default: "Filer", formal: "Dokument" },
-                    },
+                    sv: tone({ default: "Filer", formal: "Dokument" }),
                 },
             },
         });

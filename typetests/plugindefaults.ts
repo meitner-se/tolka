@@ -10,12 +10,14 @@ type Tone = "formal" | "casual";
 
 const required = definePlugin({
     tag: "tone",
-    resolve: (value: Tagged<"tone">, axis: Tone) => value.states[axis] ?? "",
+    resolve: (value: Tagged<"tone">, axis: Tone) =>
+        value.states[axis] ?? value.states.default,
 });
 
 const defaulted = definePlugin({
     tag: "tone",
-    resolve: (value: Tagged<"tone">, axis: Tone) => value.states[axis] ?? "",
+    resolve: (value: Tagged<"tone">, axis: Tone) =>
+        value.states[axis] ?? value.states.default,
     defaultAxisValue: "formal",
 });
 

@@ -72,9 +72,16 @@ export type Value<M extends string> = [SelfClosingTags<M>] extends [never]
 
 // ---------------------------------------------------------------- plugins
 
+/**
+ * A plugin's states. `default` is required: it is what the resolver falls back
+ * to, and what argument types are read from, so a set without one would lose
+ * inference silently and render nothing at runtime.
+ */
+export type TaggedStates = Record<string, string> & { default: string };
+
 export type Tagged<
     Tag extends string,
-    States extends Record<string, string> = Record<string, string>,
+    States extends TaggedStates = TaggedStates,
 > = {
     readonly __tag: Tag;
     readonly states: States;

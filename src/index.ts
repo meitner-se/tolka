@@ -37,6 +37,7 @@ export type {
     TagNames,
     TagRenderers,
     Tagged,
+    TaggedStates,
     TagsUsed,
     Value,
 } from "./types.js";

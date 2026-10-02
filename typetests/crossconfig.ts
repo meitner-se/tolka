@@ -8,8 +8,11 @@ import { createTolka, definePlugin } from "../src/index.js";
 
 const tonePlugin = definePlugin({
     tag: "tone",
-    resolve: (value: Tagged<"tone">, axis: string) => value.states[axis] ?? "",
+    resolve: (value: Tagged<"tone">, axis: string) =>
+        value.states[axis] ?? value.states.default,
 });
+
+const tone = tonePlugin.create;
 
 const withPlugin = createTolka({
     locales: ["sv", "en"] as const,
@@ -26,10 +29,7 @@ const withoutPlugin = createTolka({
 const tagged = withPlugin.createDictionary({
     content: {
         title: {
-            sv: {
-                __tag: "tone",
-                states: { default: "Filer", formal: "Dokument" },
-            },
+            sv: tone({ default: "Filer", formal: "Dokument" }),
             en: "Files",
         },
     },

@@ -13,7 +13,7 @@ type Tone = "formal" | "casual" | null;
 const tonePlugin = definePlugin({
     tag: "tone",
     resolve: (value: Tagged<"tone">, axis: Tone) =>
-        value.states[axis ?? "default"] ?? value.states["default"] ?? "",
+        value.states[axis ?? "default"] ?? value.states.default,
 });
 
 const tolka = createTolka({
