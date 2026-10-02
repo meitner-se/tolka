@@ -23,7 +23,6 @@
         "exactOptionalPropertyTypes": true,
         "allowUnreachableCode": false,
         "allowUnusedLabels": false,
-        "erasableSyntaxOnly": true,
         "forceConsistentCasingInFileNames": true
     },
     "include": ["src/**/*", "typetests/**/*"]

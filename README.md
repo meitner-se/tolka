@@ -15,7 +15,7 @@ pnpm add @meitner/tolka
 Create one instance for your app:
 
 ```ts
-// intl.config.ts
+// intl.ts
 import { createTolka, defineLocale } from "@meitner/tolka";
 
 export const tolka = createTolka({
@@ -29,7 +29,7 @@ Write content next to the component that uses it:
 
 ```ts
 // header.dictionary.ts
-import { tolka } from "./intl.config";
+import { tolka } from "./intl";
 
 export const dictionary = tolka.createDictionary({
     content: {
@@ -120,7 +120,7 @@ Bind once, then use the hook:
 ```tsx
 // intl.react.ts
 import { createReactBindings } from "@meitner/tolka/react";
-import { tolka } from "./intl.config";
+import { tolka } from "./intl";
 
 export const { DictionaryProvider, useDictionary } = createReactBindings(tolka);
 ```
@@ -265,7 +265,7 @@ For the whole corpus, add one test:
 
 ```ts
 import { runConsistencyChecks } from "@meitner/tolka/testing";
-import { tolka } from "./intl.config";
+import { tolka } from "./intl";
 
 const modules = import.meta.glob("./**/*.dictionary.ts", { eager: true });
 

@@ -1,6 +1,8 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
+        // 5.8+, and the build always runs on the pinned TypeScript.
+        "erasableSyntaxOnly": true,
         "noEmit": false,
         "outDir": "dist",
         "rootDir": "src"
