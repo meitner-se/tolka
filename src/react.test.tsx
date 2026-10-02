@@ -146,3 +146,81 @@ describe("referential stability", () => {
         expect(seen[0]).not.toBe(seen[2]);
     });
 });
+
+describe("two instances nested", () => {
+    // The monorepo shape: a generic instance for shared packages, and a
+    // domain-aware one for apps, with both providers in the same tree.
+    const generic = createTolka({
+        locales: ["sv", "en"] as const,
+        defaultLocale: "sv",
+        plugins: [] as const,
+        onError: () => {},
+    });
+    const domain = createTolka({
+        locales: ["sv", "en"] as const,
+        defaultLocale: "sv",
+        plugins: [tonePlugin] as const,
+        onError: () => {},
+    });
+
+    const genericBindings = createReactBindings(generic);
+    const domainBindings = createReactBindings(domain);
+
+    const genericDictionary = generic.createDictionary({
+        content: { label: { sv: "Generisk", en: "Generic" } },
+    });
+    const domainDictionary = domain.createDictionary({
+        content: { label: { sv: "Domän", en: "Domain" } },
+    });
+
+    function Both() {
+        const fromGeneric = genericBindings.useDictionary(genericDictionary);
+        const fromDomain = domainBindings.useDictionary(domainDictionary);
+        return (
+            <p>
+                {fromGeneric.content.label}/{fromDomain.content.label}
+            </p>
+        );
+    }
+
+    it("each hook reads its own provider, in either nesting order", () => {
+        const domainOutside = renderToStaticMarkup(
+            <domainBindings.DictionaryProvider
+                locale="sv"
+                state={{ tone: "casual" }}
+            >
+                <genericBindings.DictionaryProvider locale="en" state={{}}>
+                    <Both />
+                </genericBindings.DictionaryProvider>
+            </domainBindings.DictionaryProvider>
+        );
+        // Generic resolves in en, domain in sv. Neither overrode the other.
+        expect(domainOutside).toBe("<p>Generic/Domän</p>");
+
+        const genericOutside = renderToStaticMarkup(
+            <genericBindings.DictionaryProvider locale="en" state={{}}>
+                <domainBindings.DictionaryProvider
+                    locale="sv"
+                    state={{ tone: "casual" }}
+                >
+                    <Both />
+                </domainBindings.DictionaryProvider>
+            </genericBindings.DictionaryProvider>
+        );
+        expect(genericOutside).toBe(domainOutside);
+    });
+
+    it("a missing provider still throws, even with the other one mounted", () => {
+        function OnlyDomain() {
+            const { content } = domainBindings.useDictionary(domainDictionary);
+            return <p>{content.label}</p>;
+        }
+        expect(() =>
+            renderToStaticMarkup(
+                <genericBindings.DictionaryProvider locale="sv" state={{}}>
+                    <OnlyDomain />
+                </genericBindings.DictionaryProvider>
+            )
+        ).toThrow(/outside its DictionaryProvider/);
+    });
+});
