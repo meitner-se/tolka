@@ -32,11 +32,14 @@ jobs:
             - name: Install pnpm
               uses: pnpm/action-setup@v4
 
+            # No `registry-url`: it makes setup-node write an .npmrc carrying
+            # `_authToken=${NODE_AUTH_TOKEN}` and `always-auth=true`, so npm
+            # authenticates with an empty token instead of falling through to
+            # OIDC. The default registry is already registry.npmjs.org.
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
                   node-version: 24.x
-                  registry-url: "https://registry.npmjs.org"
                   cache: pnpm
 
             - name: Install dependencies
