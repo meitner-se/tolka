@@ -1,7 +1,9 @@
 import {
+    cloneElement,
     createContext,
     createElement,
     Fragment,
+    isValidElement,
     useContext,
     useMemo,
     type ReactNode,
@@ -71,19 +73,23 @@ function keyRenderers(args: unknown[]): unknown[] {
     if (typeof first !== "object" || first === null) {
         return args;
     }
-    let index = 0;
     const keyed: Record<string, unknown> = {};
     for (const [name, value] of Object.entries(first)) {
-        keyed[name] = isFormatter(value)
-            ? (...inner: unknown[]) => {
-                  index += 1;
-                  return createElement(
-                      Fragment,
-                      { key: index },
-                      asNode(value(...inner))
-                  );
-              }
-            : value;
+        if (!isFormatter(value)) {
+            keyed[name] = value;
+            continue;
+        }
+        // Per tag, so the keys read as `li0`, `li1` rather than one running
+        // count across every tag in the message.
+        let index = 0;
+        keyed[name] = (...inner: unknown[]) => {
+            const result = value(...inner);
+            if (!isValidElement(result)) {
+                return result;
+            }
+            index += 1;
+            return cloneElement(result, { key: `${name}${index}` });
+        };
     }
     return [keyed, ...rest];
 }
