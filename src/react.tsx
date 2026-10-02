@@ -53,13 +53,48 @@ function isFormatter(value: unknown): value is Formatter {
     return typeof value === "function";
 }
 
+/**
+ * Tag renderers, wrapped so each element they return carries a key.
+ *
+ * `toNode` keys only the array `format` returns at the top. A nested tag hands
+ * its renderer an array of already-built elements as `chunks` — `<ul>` receives
+ * its `<li>`s — and the renderer created each of those without a key, so React
+ * warns once per element. A call site cannot fix this:
+ * `Children.toArray(chunks)` keys the children, while React validates the
+ * element the renderer handed back.
+ *
+ * The counter restarts per call, so a key depends on the message rather than on
+ * how many times it has been rendered.
+ */
+function keyRenderers(args: unknown[]): unknown[] {
+    const [first, ...rest] = args;
+    if (typeof first !== "object" || first === null) {
+        return args;
+    }
+    let index = 0;
+    const keyed: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(first)) {
+        keyed[name] = isFormatter(value)
+            ? (...inner: unknown[]) => {
+                  index += 1;
+                  return createElement(
+                      Fragment,
+                      { key: index },
+                      asNode(value(...inner))
+                  );
+              }
+            : value;
+    }
+    return [keyed, ...rest];
+}
+
 function wrapFormatters(
     content: Record<string, unknown>
 ): Record<string, unknown> {
     const wrapped: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(content)) {
         wrapped[key] = isFormatter(value)
-            ? (...args: unknown[]) => toNode(value(...args))
+            ? (...args: unknown[]) => toNode(value(...keyRenderers(args)))
             : value;
     }
     return wrapped;

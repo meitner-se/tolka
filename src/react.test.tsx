@@ -224,3 +224,60 @@ describe("two instances nested", () => {
         ).toThrow(/outside its DictionaryProvider/);
     });
 });
+
+const nestedTolka = createTolka({
+    locales: ["sv"],
+    defaultLocale: "sv",
+    plugins: [],
+});
+const nested = createReactBindings(nestedTolka);
+const nestedDictionary = nestedTolka.createDictionary({
+    content: {
+        // `<ul>` receives its `<li>` elements as chunks, which is the only
+        // place a renderer's own output lands inside an array.
+        alert: {
+            sv: "<p><b>Head:</b></p><ul><li>One</li><li>Two</li></ul>",
+        },
+    },
+});
+
+// Hoisted: defined inside the component these read as nested components.
+const renderers = {
+    p: (chunks: ReactNode) => <p>{chunks}</p>,
+    b: (chunks: ReactNode) => <b>{chunks}</b>,
+    ul: (chunks: ReactNode) => <ul>{chunks}</ul>,
+    li: (chunks: ReactNode) => <li>{chunks}</li>,
+};
+
+function Probe() {
+    const { content } = nested.useDictionary(nestedDictionary);
+    return <>{content.alert(renderers)}</>;
+}
+
+function renderNested(): { html: string; keyWarnings: number } {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const html = renderToStaticMarkup(
+        <nested.DictionaryProvider locale="sv" state={{}}>
+            <Probe />
+        </nested.DictionaryProvider>
+    );
+    const keyWarnings = spy.mock.calls.filter((args) =>
+        String(args[0]).includes('unique "key"')
+    ).length;
+    spy.mockRestore();
+    return { html, keyWarnings };
+}
+
+describe("nested tag renderers", () => {
+    it("renders the markup", () => {
+        expect(renderNested().html).toBe(
+            "<p><b>Head:</b></p><ul><li>One</li><li>Two</li></ul>"
+        );
+    });
+
+    it("warns about no missing keys", () => {
+        // The library keys each renderer's output. A call site cannot: wrapping
+        // the chunks keys the children, not the element React is validating.
+        expect(renderNested().keyWarnings).toBe(0);
+    });
+});
