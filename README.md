@@ -113,21 +113,36 @@ content.confirm({ name: "report.pdf", b: (chunks) => <strong>{chunks}</strong> }
 Tags carry no attributes. Anything dynamic arrives through a placeholder, which
 is escaped, so translated copy can never introduce markup.
 
-A renderer per tag is what you want when copy and components interleave. When a
-message is just a block of markup, `htmlTags` covers the content-only tags:
+A renderer per tag is what you want when copy and components interleave — a
+link around part of a sentence, emphasis around an interpolated name.
+
+When a message is a block of markup instead, writing one per call site gets
+tedious. Keep a shared object and spread it:
 
 ```tsx
-import { htmlTags } from "@meitner/tolka/react";
+// intl.tags.tsx
+export const tags = {
+    p: (chunks: ReactNode) => <p>{chunks}</p>,
+    strong: (chunks: ReactNode) => <strong>{chunks}</strong>,
+    ul: (chunks: ReactNode) => <ul>{chunks}</ul>,
+    li: (chunks: ReactNode) => <li>{chunks}</li>,
+};
 
-content.terms(htmlTags);
-content.notice({ ...htmlTags, name: user.name });
+content.terms(tags);
+content.notice({ ...tags, name: user.name });
 ```
 
-`a` is deliberately not in it. A link needs an href, and reading one out of
-translated copy is the thing this design exists to prevent, so give it a
-renderer of your own with the href from code.
+tolka does not ship that object, deliberately. Which tags belong in it is a
+decision about your content, and any set the library picked would be wrong for
+someone. Keeping it in your code also keeps the choice visible: a tag you have
+not listed is a compile error at the call site, not a silent rendering.
 
-`<br>` has to be written `<br></br>` — see the ICU notes further down.
+Leave `a` out of a shared set. A link needs an href, and an href taken from
+translated copy is the one thing this design prevents — so give it a renderer
+of its own, with the href supplied from code.
+
+Void elements take no chunks, and ICU has no self-closing tags, so write
+`<br></br>` in the message. `<br/>` renders as its own source text.
 
 ## React
 

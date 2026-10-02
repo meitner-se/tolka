@@ -206,35 +206,3 @@ export function createReactBindings<
 
     return { DictionaryProvider, useDictionary };
 }
-
-/**
- * Renderers for the content-only HTML tags, for a message that is a block of
- * markup rather than copy with components in it:
- *
- * ```tsx
- * content.terms(htmlTags);
- * content.notice({ ...htmlTags, name: user.name });
- * ```
- *
- * Passed explicitly rather than applied by default, so a message's rendering
- * stays readable at the call site. `a` is deliberately absent: a link needs an
- * href, and taking one from translated copy is the single thing the tag design
- * exists to prevent. Give it a renderer of your own, with the href from code.
- *
- * `<br>` has to be written `<br></br>`. ICU has no self-closing tags, so `<br/>`
- * renders as its own source text and a bare `<br>` fails to parse.
- */
-export const htmlTags = {
-    p: (chunks: ReactNode) => <p>{chunks}</p>,
-    h2: (chunks: ReactNode) => <h2>{chunks}</h2>,
-    h3: (chunks: ReactNode) => <h3>{chunks}</h3>,
-    h4: (chunks: ReactNode) => <h4>{chunks}</h4>,
-    strong: (chunks: ReactNode) => <strong>{chunks}</strong>,
-    b: (chunks: ReactNode) => <b>{chunks}</b>,
-    em: (chunks: ReactNode) => <em>{chunks}</em>,
-    i: (chunks: ReactNode) => <i>{chunks}</i>,
-    ul: (chunks: ReactNode) => <ul>{chunks}</ul>,
-    ol: (chunks: ReactNode) => <ol>{chunks}</ol>,
-    li: (chunks: ReactNode) => <li>{chunks}</li>,
-    br: () => <br />,
-};
