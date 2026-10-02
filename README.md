@@ -113,6 +113,22 @@ content.confirm({ name: "report.pdf", b: (chunks) => <strong>{chunks}</strong> }
 Tags carry no attributes. Anything dynamic arrives through a placeholder, which
 is escaped, so translated copy can never introduce markup.
 
+A renderer per tag is what you want when copy and components interleave. When a
+message is just a block of markup, `htmlTags` covers the content-only tags:
+
+```tsx
+import { htmlTags } from "@meitner/tolka/react";
+
+content.terms(htmlTags);
+content.notice({ ...htmlTags, name: user.name });
+```
+
+`a` is deliberately not in it. A link needs an href, and reading one out of
+translated copy is the thing this design exists to prevent, so give it a
+renderer of your own with the href from code.
+
+`<br>` has to be written `<br></br>` — see the ICU notes further down.
+
 ## React
 
 Bind once, then use the hook:
