@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Tagged } from "./types.js";
 
-import { createReactBindings } from "./react.js";
+import { createReactBindings, htmlTags } from "./react.js";
 import { createTolka, definePlugin } from "./runtime.js";
 
 type Tone = "formal" | "casual";
@@ -279,5 +279,68 @@ describe("nested tag renderers", () => {
         // The library keys each renderer's output. A call site cannot: wrapping
         // the chunks keys the children, not the element React is validating.
         expect(renderNested().keyWarnings).toBe(0);
+    });
+});
+
+const markupTolka = createTolka({
+    locales: ["sv"],
+    defaultLocale: "sv",
+    plugins: [],
+});
+const markup = createReactBindings(markupTolka);
+const markupDictionary = markupTolka.createDictionary({
+    content: {
+        terms: {
+            sv: "<p><strong>Tas bort:</strong></p><ul><li>Ett</li><li>Två</li></ul>",
+        },
+        lineBreak: { sv: "Rad ett<br></br>rad två" },
+    },
+});
+
+function Terms() {
+    const { content } = markup.useDictionary(markupDictionary);
+    return <>{content.terms(htmlTags)}</>;
+}
+
+function LineBreak() {
+    const { content } = markup.useDictionary(markupDictionary);
+    return <>{content.lineBreak(htmlTags)}</>;
+}
+
+describe("htmlTags", () => {
+    it("renders a block of markup without a renderer per call site", () => {
+        expect(
+            renderToStaticMarkup(
+                <markup.DictionaryProvider locale="sv" state={{}}>
+                    <Terms />
+                </markup.DictionaryProvider>
+            )
+        ).toBe(
+            "<p><strong>Tas bort:</strong></p><ul><li>Ett</li><li>Två</li></ul>"
+        );
+    });
+
+    it("renders a paired <br></br>, which is the only form ICU accepts", () => {
+        expect(
+            renderToStaticMarkup(
+                <markup.DictionaryProvider locale="sv" state={{}}>
+                    <LineBreak />
+                </markup.DictionaryProvider>
+            )
+        ).toBe("Rad ett<br/>rad två");
+    });
+
+    it("warns about no missing keys", () => {
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        renderToStaticMarkup(
+            <markup.DictionaryProvider locale="sv" state={{}}>
+                <Terms />
+            </markup.DictionaryProvider>
+        );
+        const warnings = spy.mock.calls.filter((args) =>
+            String(args[0]).includes('unique "key"')
+        ).length;
+        spy.mockRestore();
+        expect(warnings).toBe(0);
     });
 });
