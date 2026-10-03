@@ -49,7 +49,15 @@ jobs:
               id: changesets
               uses: changesets/action@v1
               with:
-                  publish: "npx changeset publish"
+                  # `npm publish`, not `npx changeset publish`: changesets
+                  # delegates to whichever package manager it detects, and for
+                  # this repo that is pnpm, which does not implement npm's
+                  # trusted publishing. It therefore published with no
+                  # credentials at all and npm answered E403 — while changesets
+                  # crashed classifying that error, so the cause never reached
+                  # the log. `--access public` is required because the npm org
+                  # has no plan for private packages.
+                  publish: "npm publish --access public"
                   title: "Version Packages"
                   commit: "Version Packages"
               env:
