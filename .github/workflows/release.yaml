@@ -57,7 +57,7 @@ jobs:
                   # crashed classifying that error, so the cause never reached
                   # the log. `--access public` is required because the npm org
                   # has no plan for private packages.
-                  publish: "npm publish --access public"
+                  publish: "node scripts/publish.mjs"
                   title: "Version Packages"
                   commit: "Version Packages"
               env:
