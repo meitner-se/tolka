@@ -1,5 +1,5 @@
 ---
-"@meitner/tolka": minor
+"@meitner/tolka": patch
 ---
 
 Export `DefinedPlugin` and `PluginCreate`, so a package can define a plugin and re-export it.
