@@ -1,6 +1,6 @@
 {
     "name": "@meitner/tolka",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "Typesafe ICU message formatting with direct imports, no registry and no build step.",
     "license": "MIT",
     "repository": {
