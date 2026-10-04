@@ -6,6 +6,7 @@ import { IntlMessageFormat } from "intl-messageformat";
 
 import type {
     AnyPlugin,
+    Plugin,
     Content,
     Dictionary,
     DictionaryMeta,
@@ -113,6 +114,19 @@ export type PluginCreate<Tag extends string> = <
 >(
     states: States
 ) => Tagged<Tag, States>;
+
+/**
+ * What `definePlugin` returns: the plugin plus its authoring helper.
+ *
+ * A package that defines a plugin and re-exports it has to name this type. The
+ * inferred one mentions `PluginCreate`, and a package that emits declarations
+ * then fails with TS2883 -- "cannot be named without a reference to ...; a type
+ * annotation is necessary" -- so leaving it unnamed is not an option
+ * downstream.
+ */
+export type DefinedPlugin<Tag extends string, Axis> = Plugin<Tag, Axis> & {
+    create: PluginCreate<Tag>;
+};
 
 /**
  * Returns the literal shape rather than the `Plugin` interface, so whether a

@@ -1,6 +1,8 @@
 export { createTolka, defineLocale, definePlugin } from "./runtime.js";
 export type {
+    DefinedPlugin,
     ErrorInfo,
+    PluginCreate,
     PostResolve,
     ResolveInfo,
     Tolka,
