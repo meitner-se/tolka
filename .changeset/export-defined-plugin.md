@@ -4,7 +4,7 @@
 
 Export `DefinedPlugin` and `PluginCreate`, so a package can define a plugin and re-export it.
 
-`definePlugin`'s return type mentions `PluginCreate`, which was declared but not reachable from the entry point. A package that emits declarations — which any shared package does — therefore could not name the type of its own plugin, and failed to build with TS2883: *the inferred type cannot be named without a reference to `PluginCreate`; a type annotation is necessary.*
+`definePlugin`'s return type mentions `PluginCreate`, which was declared but not reachable from the entry point. A package that emits declarations — which any shared package does — therefore could not name the type of its own plugin, and failed to build with TS2883: _the inferred type cannot be named without a reference to `PluginCreate`; a type annotation is necessary._
 
 `DefinedPlugin<Tag, Axis>` is that annotation, and is what `definePlugin` returns:
 
