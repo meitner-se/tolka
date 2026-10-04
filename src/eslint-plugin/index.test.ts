@@ -67,3 +67,23 @@ describe("static-content", () => {
         });
     });
 });
+
+describe("static-content, a string however it is quoted", () => {
+    it("treats a plain template the same wherever it appears", () => {
+        ruleTester.run("static-content", rules["static-content"], {
+            valid: [
+                {
+                    code: "tolka.createDictionary({ content: { a: { sv: tone({ default: `Hej` }) } } });",
+                },
+            ],
+            invalid: [
+                {
+                    // An interpolation has to run, in either position.
+                    // oxlint-disable-next-line no-template-curly-in-string -- the placeholder is the fixture
+                    code: "tolka.createDictionary({ content: { a: { sv: tone({ default: `${x}` }) } } });",
+                    errors: [{ messageId: "computed" }],
+                },
+            ],
+        });
+    });
+});

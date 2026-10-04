@@ -47,6 +47,14 @@ function contentObject(node: CallExpression): ObjectExpression | undefined {
     return undefined;
 }
 
+/** A string, however it is quoted. A template with no `${}` is still a literal. */
+function isLiteralString(node: Value): boolean {
+    if (node.type === "Literal") {
+        return typeof node.value === "string";
+    }
+    return node.type === "TemplateLiteral" && node.expressions.length === 0;
+}
+
 /**
  * A plugin's authoring helper: one call, one object literal, string values.
  *
@@ -64,21 +72,12 @@ function isPluginCall(node: Value): boolean {
     }
     return states.properties.every(
         (property) =>
-            property.type === "Property" &&
-            property.value.type === "Literal" &&
-            typeof property.value.value === "string"
+            property.type === "Property" && isLiteralString(property.value)
     );
 }
 
 function isReadableWithoutRunning(node: Value): boolean {
-    if (node.type === "Literal") {
-        return typeof node.value === "string";
-    }
-    // A template with no `${}` is a literal written with different quotes.
-    if (node.type === "TemplateLiteral") {
-        return node.expressions.length === 0;
-    }
-    return isPluginCall(node);
+    return isLiteralString(node) || isPluginCall(node);
 }
 
 const staticContent: Rule.RuleModule = {
