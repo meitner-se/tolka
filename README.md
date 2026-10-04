@@ -309,6 +309,29 @@ test("content is consistent", () => {
 It reports placeholder drift, tag drift, unparseable ICU, undeclared locales and
 self-closing tags, and it tells you which file each one came from.
 
+## Keeping content readable without running it
+
+```js
+// eslint.config.js
+import tolka from "@meitner/tolka/eslint-plugin";
+
+export default [
+    {
+        files: ["**/*.dictionary.ts"],
+        plugins: { tolka },
+        rules: { "tolka/static-content": "error" },
+    },
+];
+```
+
+Content has to be string literals and plugin calls. TypeScript will not enforce
+that, and the consistency checker, a future editor and any export all depend on
+it — they read content, they do not run it.
+
+The rule's main job is the spread. Reaching for `...common.content` to share
+copy is the first instinct; the answer is two dictionaries side by side, which
+with direct imports is just another import.
+
 ## Things that catch people out
 
 **ICU has no self-closing tags.** `<Value />` parses as literal text. It renders
