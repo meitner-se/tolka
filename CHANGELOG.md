@@ -1,5 +1,22 @@
 # @meitner/tolka
 
+## 0.0.3
+
+### Patch Changes
+
+- [`5b50ad0`](https://github.com/meitner-se/tolka/commit/5b50ad097cd1905962f39ed04a4cbaaebddfe2e8) Thanks [@MattisAbrahamsson](https://github.com/MattisAbrahamsson)! - Export `DefinedPlugin` and `PluginCreate`, so a package can define a plugin and re-export it.
+
+  `definePlugin`'s return type mentions `PluginCreate`, which was declared but not reachable from the entry point. A package that emits declarations — which any shared package does — therefore could not name the type of its own plugin, and failed to build with TS2883: _the inferred type cannot be named without a reference to `PluginCreate`; a type annotation is necessary._
+
+  `DefinedPlugin<Tag, Axis>` is that annotation, and is what `definePlugin` returns:
+
+  ```ts
+  export const schoolTypePlugin: DefinedPlugin<"schoolType", SchoolType> = definePlugin({ … });
+  export const schoolType: PluginCreate<"schoolType"> = schoolTypePlugin.create;
+  ```
+
+  Found by moving a plugin into a shared package so several apps could agree on one definition of the axis — which is exactly the arrangement the plugin system exists to support, and the one case the types did not allow.
+
 ## 0.0.2
 
 ### Patch Changes
