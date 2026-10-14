@@ -167,3 +167,112 @@ describe("locale coverage", () => {
         });
     });
 });
+
+describe("groups", () => {
+    it("checks a branch and names it by path", () => {
+        const findings = checkDictionary(
+            {
+                sectionType: {
+                    // `{name}` in sv, `{title}` in en -- the drift the
+                    // derived param types rest on not happening.
+                    Program: { sv: "Programmet {name}", en: "The {title}" },
+                },
+            },
+            "sv"
+        );
+
+        expect(kinds(findings)).toEqual(["placeholder-drift"]);
+        expect(findings[0]?.key).toBe("sectionType.Program");
+    });
+
+    it("checks to any depth", () => {
+        const findings = checkDictionary(
+            { errorCodes: { NotFound: { title: { sv: "{a}", en: "{b}" } } } },
+            "sv"
+        );
+
+        expect(findings[0]?.key).toBe("errorCodes.NotFound.title");
+    });
+
+    it("is silent on a consistent group", () => {
+        expect(
+            kinds(
+                checkDictionary(
+                    {
+                        save: { sv: "Spara", en: "Save" },
+                        sectionType: {
+                            Program: { sv: "Program", en: "Programme" },
+                        },
+                    },
+                    "sv"
+                )
+            )
+        ).toEqual([]);
+    });
+
+    it("reads an undeclared locale inside a group", () => {
+        const findings = checkDictionary(
+            { group: { branch: { sv: "Hej", eng: "Hi" } } },
+            "sv",
+            undefined,
+            ["sv", "en"]
+        );
+
+        expect(kinds(findings)).toContain("unknown-locale");
+        expect(findings[0]?.key).toBe("group.branch");
+    });
+
+    it("keeps a group and a literal dotted key that share a label", () => {
+        // `"section.Program"` is a legal key, and it reads the same as the
+        // group's path. Keyed by that label one would overwrite the other and
+        // vanish from checking -- a silent gap in a gate the derived types
+        // rest on.
+        const findings = checkDictionary(
+            {
+                "section.Program": { sv: "{a}", en: "{b}" },
+                section: { Program: { sv: "{c}", en: "{d}" } },
+            },
+            "sv"
+        );
+
+        expect(findings).toHaveLength(2);
+        expect(
+            findings.every((finding) => finding.key === "section.Program")
+        ).toBe(true);
+    });
+
+    it("counts both of those towards coverage", () => {
+        const coverage = localeCoverage(
+            {
+                "section.Program": { sv: "x", en: "y" },
+                section: { Program: { sv: "x", en: "y" } },
+            },
+            ["sv"]
+        );
+
+        expect(coverage["sv"]?.total).toBe(2);
+    });
+
+    it("skips a key whose value is not a node at all", () => {
+        // Same degraded shape the runtime guards against; flattening must not
+        // walk into a primitive.
+        expect(checkDictionary({ stray: "oops" }, "sv")).toEqual([]);
+    });
+
+    it("counts branches, not groups, towards coverage", () => {
+        const coverage = localeCoverage(
+            {
+                save: { sv: "Spara", en: "Save" },
+                sectionType: {
+                    Program: { sv: "Program", en: "Programme" },
+                    Orientation: { sv: "Inriktning" },
+                },
+            },
+            ["sv", "en"]
+        );
+
+        // Three keys carry copy; the group itself is not one of them.
+        expect(coverage["sv"]?.total).toBe(3);
+        expect(coverage["en"]?.present).toBe(2);
+    });
+});

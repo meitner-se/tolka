@@ -92,6 +92,46 @@ content.when({ at: new Date() }); // ok
 content.when({ at: "today" }); // Error: at is a Date
 ```
 
+## Copy chosen by a value
+
+A key can hold a group of further keys instead of copy. That is how a closed
+union is read dynamically while the compiler still proves every branch exists:
+
+```ts
+export const dictionary = createDictionary({
+    content: {
+        sectionType: {
+            Program: { sv: "Programgemensam", en: "Programme specific" },
+            Orientation: { sv: "Inriktningsgemensam", en: "Orientation" },
+        },
+    },
+});
+
+const { content } = useDictionary(dictionary);
+
+content.sectionType[category]; // string
+```
+
+Add a third member to `category` without adding its branch and the index stops
+compiling. That is the whole point of the shape — an ICU `select` cannot do it,
+because `select` requires an `other` clause and `other` widens the argument to
+`string`.
+
+Groups nest as deep as you like, which is what the two-level case needs:
+
+```ts
+content.errorCodes[code].title;
+```
+
+Depth is bounded at four levels in the types, and the `content-depth` rule
+stops at two by default. Past that, a dictionary is becoming a namespace tree,
+which is the thing colocation and direct imports exist to avoid — split it
+instead.
+
+A branch may be named after a locale (`sv`, `en`). Nothing reads key names: a
+locale map's values are copy, a group's values are records, and that is the
+only distinction being made.
+
 ## Rich text
 
 ICU tags get a renderer per call. The return type changes to `ReactNode` as
@@ -319,7 +359,10 @@ export default [
     {
         files: ["**/*.dictionary.ts"],
         plugins: { tolka },
-        rules: { "tolka/static-content": "error" },
+        rules: {
+            "tolka/static-content": "error",
+            "tolka/content-depth": "warn",
+        },
     },
 ];
 ```

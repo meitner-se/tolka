@@ -186,10 +186,46 @@ export type Leaf = string | Tagged<string>;
  * required locale is a compile error at authoring time, which is what makes
  * the sv->en coercion bug class structurally impossible.
  */
-export type Content<L extends string, R extends L = L> = Record<
-    string,
-    { [K in R]: Leaf } & { [K in Exclude<L, R>]?: Leaf | undefined }
->;
+export type LocaleMap<L extends string, R extends L = L> = {
+    [K in R]: Leaf;
+} & { [K in Exclude<L, R>]?: Leaf | undefined };
+
+/**
+ * A key maps either to its copy, one entry per locale, or to a group of
+ * further keys. Groups exist so a closed union can be read dynamically
+ * (`content.sectionType[category]`) while the compiler still proves every
+ * branch has copy.
+ *
+ * The two cases never collide: a locale map's values are `Leaf`, a group's
+ * are records. That holds even for a branch named after a locale, which is
+ * why nothing here inspects key names.
+ */
+/**
+ * Counts the type's expansion down to zero. Unbounded recursion here is what
+ * TypeScript 5.6 and 5.7 reject with TS2589 ("excessively deep"); 5.9 accepts
+ * it, so without the bound the declared support range would quietly become
+ * 5.8+. Four levels is far past anything content should need -- the lint rule
+ * stops authors at two -- and the runtime recursion is not bounded at all.
+ */
+type Down = [never, 0, 1, 2, 3];
+
+export type Content<
+    L extends string,
+    R extends L = L,
+    D extends 0 | 1 | 2 | 3 | 4 = 4,
+> = {
+    [key: string]: D extends 0
+        ? LocaleMap<L, R>
+        : LocaleMap<L, R> | Content<L, R, Down[D]>;
+};
+
+/**
+ * True when a node carries copy rather than further keys. `Leaf` is a string
+ * or a plugin tag, and a group's values are neither.
+ */
+export type IsLocaleMap<T> = [Extract<T[keyof T], Leaf>] extends [never]
+    ? false
+    : true;
 
 /**
  * Param types are seeded from the default locale and the `default` axis state.
@@ -207,10 +243,16 @@ export type MessageOf<V> = V extends string
       : string;
 
 /** Which plugin tags a dictionary's content actually uses. */
-export type TagsUsed<C> = {
-    [K in keyof C]: {
-        [Loc in keyof C[K]]: C[K][Loc] extends Tagged<infer T> ? T : never;
-    }[keyof C[K]];
+export type TagsUsed<C, N extends 0 | 1 | 2 | 3 | 4 = 4> = {
+    [K in keyof C]: IsLocaleMap<C[K]> extends true
+        ? {
+              [Loc in keyof C[K]]: C[K][Loc] extends Tagged<infer T>
+                  ? T
+                  : never;
+          }[keyof C[K]]
+        : N extends 0
+          ? never
+          : TagsUsed<C[K], Down[N]>;
 }[keyof C];
 
 /**
@@ -227,6 +269,19 @@ export interface Dictionary<C> {
     meta?: DictionaryMeta | undefined;
 }
 
-export type Resolved<C, D extends PropertyKey> = {
-    [K in keyof C]: D extends keyof C[K] ? Value<MessageOf<C[K][D]>> : never;
+/**
+ * Probing with the default locale, rather than key names, is what keeps a
+ * group whose branch is called `sv` from reading as a locale map: that
+ * branch's value is a record, not a `Leaf`.
+ */
+export type Resolved<
+    C,
+    D extends PropertyKey,
+    N extends 0 | 1 | 2 | 3 | 4 = 4,
+> = {
+    [K in keyof C]: C[K] extends Record<D, Leaf>
+        ? Value<MessageOf<C[K][D]>>
+        : N extends 0
+          ? never
+          : Resolved<C[K], D, Down[N]>;
 };

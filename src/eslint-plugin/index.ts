@@ -130,6 +130,97 @@ const staticContent: Rule.RuleModule = {
     },
 };
 
-export const rules = { "static-content": staticContent };
+/**
+ * A group's values are objects; a locale map's are literals and plugin calls.
+ * Same discriminator the runtime uses, read syntactically.
+ */
+function isLocaleMapNode(object: ObjectExpression): boolean {
+    return !object.properties.some(
+        (property) =>
+            property.type === "Property" &&
+            property.value.type === "ObjectExpression"
+    );
+}
+
+const contentDepth: Rule.RuleModule = {
+    meta: {
+        type: "suggestion",
+        docs: {
+            description:
+                "keep dictionary groups shallow, so content stays colocated rather than becoming a namespace tree",
+        },
+        schema: [
+            {
+                type: "object",
+                properties: { max: { type: "integer", minimum: 0 } },
+                additionalProperties: false,
+            },
+        ],
+        messages: {
+            tooDeep:
+                "This key is {{depth}} groups deep; at most {{max}} is intended. Deep nesting rebuilds the namespace tree that colocated dictionaries replace -- split the dictionary instead.",
+        },
+    },
+    create(context) {
+        const option: unknown = context.options[0];
+        const max =
+            typeof option === "object" &&
+            option !== null &&
+            "max" in option &&
+            typeof option.max === "number"
+                ? option.max
+                : 2;
+
+        function walk(object: ObjectExpression, depth: number): void {
+            if (isLocaleMapNode(object)) {
+                return;
+            }
+            for (const property of object.properties) {
+                if (
+                    property.type !== "Property" ||
+                    property.value.type !== "ObjectExpression"
+                ) {
+                    continue;
+                }
+                if (depth + 1 > max) {
+                    context.report({
+                        node: property,
+                        messageId: "tooDeep",
+                        data: { depth: String(depth + 1), max: String(max) },
+                    });
+                    continue;
+                }
+                walk(property.value, depth + 1);
+            }
+        }
+
+        return {
+            CallExpression(node: CallExpression) {
+                if (!isCreateDictionary(node)) {
+                    return;
+                }
+                const content = contentObject(node);
+                if (!content) {
+                    return;
+                }
+                // The content root's own keys are not groups; depth counts
+                // the group levels between a key and its copy.
+                for (const property of content.properties) {
+                    if (
+                        property.type === "Property" &&
+                        property.value.type === "ObjectExpression"
+                    ) {
+                        walk(property.value, 0);
+                    }
+                }
+            },
+        };
+    },
+};
+
+export const rules = {
+    "static-content": staticContent,
+    "content-depth": contentDepth,
+};
 
 export default { rules };
