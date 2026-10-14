@@ -692,3 +692,89 @@ describe("two independent counts in one message", () => {
         );
     });
 });
+
+describe("groups", () => {
+    const tolka = setup();
+
+    const dictionary = tolka.createDictionary({
+        content: {
+            save: { sv: "Spara", en: "Save" },
+            sectionType: {
+                Program: { sv: "Programgemensam", en: "Programme specific" },
+                Orientation: { sv: "Inriktningsgemensam", en: "Orientation" },
+            },
+            errorCodes: {
+                NotFound: {
+                    title: { sv: "Hittades inte", en: "Not found" },
+                },
+            },
+            counted: {
+                Program: {
+                    sv: "{count, plural, =1 {1 kurs} other {# kurser}}",
+                    en: "{count, plural, =1 {1 course} other {# courses}}",
+                },
+            },
+            tagged: {
+                Program: {
+                    sv: tone({ default: "Programmet", terse: "Prog" }),
+                    en: "The programme",
+                },
+            },
+        },
+    });
+
+    function resolve(locale: "sv" | "en" = "sv") {
+        return tolka.resolveDictionary(dictionary, {
+            locale,
+            state: { tone: "formal" },
+        }).content;
+    }
+
+    it("resolves a branch without disturbing flat keys beside it", () => {
+        const content = resolve();
+
+        expect(content.save).toBe("Spara");
+        expect(content.sectionType.Program).toBe("Programgemensam");
+        expect(content.sectionType.Orientation).toBe("Inriktningsgemensam");
+    });
+
+    it("nests to any depth", () => {
+        expect(resolve().errorCodes.NotFound.title).toBe("Hittades inte");
+    });
+
+    it("picks the locale inside a group", () => {
+        expect(resolve("en").sectionType.Program).toBe("Programme specific");
+    });
+
+    it("derives params inside a group", () => {
+        expect(call(resolve().counted.Program, { count: 2 })).toBe("2 kurser");
+    });
+
+    it("resolves a plugin tag inside a group", () => {
+        const terse = tolka.resolveDictionary(dictionary, {
+            locale: "sv",
+            state: { tone: "terse" },
+        }).content;
+
+        expect(resolve().tagged.Program).toBe("Programmet");
+        expect(terse.tagged.Program).toBe("Prog");
+    });
+
+    it("reports an absent key inside a group by its path", () => {
+        const onError = vi.fn();
+        const reporting = setup(onError);
+        const partial = reporting.createDictionary({
+            // A key absent from every locale must still be reported rather
+            // than read as an empty group.
+            content: { group: { branch: {} } },
+        });
+
+        const { content } = reporting.resolveDictionary(partial, {
+            locale: "sv",
+            state: { tone: "formal" },
+        });
+
+        expect((content as Record<string, Record<string, unknown>>)["group"]?.["branch"]).toBe("");
+        expect(String(onError.mock.calls[0]?.[0])).toContain("group.branch");
+    });
+});

@@ -167,3 +167,75 @@ describe("locale coverage", () => {
         });
     });
 });
+
+describe("groups", () => {
+    it("checks a branch and names it by path", () => {
+        const findings = checkDictionary(
+            {
+                sectionType: {
+                    // `{name}` in sv, `{title}` in en -- the drift the
+                    // derived param types rest on not happening.
+                    Program: { sv: "Programmet {name}", en: "The {title}" },
+                },
+            },
+            "sv"
+        );
+
+        expect(kinds(findings)).toEqual(["placeholder-drift"]);
+        expect(findings[0]?.key).toBe("sectionType.Program");
+    });
+
+    it("checks to any depth", () => {
+        const findings = checkDictionary(
+            { errorCodes: { NotFound: { title: { sv: "{a}", en: "{b}" } } } },
+            "sv"
+        );
+
+        expect(findings[0]?.key).toBe("errorCodes.NotFound.title");
+    });
+
+    it("is silent on a consistent group", () => {
+        expect(
+            kinds(
+                checkDictionary(
+                    {
+                        save: { sv: "Spara", en: "Save" },
+                        sectionType: {
+                            Program: { sv: "Program", en: "Programme" },
+                        },
+                    },
+                    "sv"
+                )
+            )
+        ).toEqual([]);
+    });
+
+    it("reads an undeclared locale inside a group", () => {
+        const findings = checkDictionary(
+            { group: { branch: { sv: "Hej", eng: "Hi" } } },
+            "sv",
+            undefined,
+            ["sv", "en"]
+        );
+
+        expect(kinds(findings)).toContain("unknown-locale");
+        expect(findings[0]?.key).toBe("group.branch");
+    });
+
+    it("counts branches, not groups, towards coverage", () => {
+        const coverage = localeCoverage(
+            {
+                save: { sv: "Spara", en: "Save" },
+                sectionType: {
+                    Program: { sv: "Program", en: "Programme" },
+                    Orientation: { sv: "Inriktning" },
+                },
+            },
+            ["sv", "en"]
+        );
+
+        // Three keys carry copy; the group itself is not one of them.
+        expect(coverage["sv"]?.total).toBe(3);
+        expect(coverage["en"]?.present).toBe(2);
+    });
+});

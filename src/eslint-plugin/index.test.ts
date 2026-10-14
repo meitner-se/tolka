@@ -87,3 +87,43 @@ describe("static-content, a string however it is quoted", () => {
         });
     });
 });
+
+describe("content-depth", () => {
+    it("allows the shapes the migration needs and flags a namespace tree", () => {
+        ruleTester.run("content-depth", rules["content-depth"], {
+            valid: [
+                {
+                    // Flat: no groups at all.
+                    code: `tolka.createDictionary({ content: { a: { sv: "Hej", en: "Hi" } } });`,
+                },
+                {
+                    // One group -- the union lookup this exists for.
+                    code: `tolka.createDictionary({ content: { sectionType: { Program: { sv: "P", en: "P" } } } });`,
+                },
+                {
+                    // Two -- errorCodes[code].title.
+                    code: `tolka.createDictionary({ content: { errorCodes: { NotFound: { title: { sv: "H", en: "N" } } } } });`,
+                },
+                {
+                    // A plugin call is a locale map's value, never a group.
+                    code: `tolka.createDictionary({ content: { a: { sv: schoolType({ default: "Elever", Preschool: "Barn" }) } } });`,
+                },
+                {
+                    code: `tolka.createDictionary({ content: { a: { b: { c: { d: { sv: "x" } } } } } });`,
+                    options: [{ max: 3 }],
+                },
+            ],
+            invalid: [
+                {
+                    code: `tolka.createDictionary({ content: { page: { section: { header: { title: { sv: "x", en: "y" } } } } } });`,
+                    errors: [{ messageId: "tooDeep" }],
+                },
+                {
+                    code: `tolka.createDictionary({ content: { a: { b: { sv: "x", en: "y" } } } });`,
+                    options: [{ max: 0 }],
+                    errors: [{ messageId: "tooDeep" }],
+                },
+            ],
+        });
+    });
+});

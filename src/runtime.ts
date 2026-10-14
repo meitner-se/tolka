@@ -22,7 +22,12 @@ import type {
     TagsUsed,
 } from "./types.js";
 
-import { checkDictionary, formatFindings, type Finding } from "./check.js";
+import {
+    checkDictionary,
+    formatFindings,
+    isLocaleMap,
+    type Finding,
+} from "./check.js";
 
 /**
  * `message` is the identifier. With direct imports a dictionary is an anonymous
@@ -324,14 +329,39 @@ export function createTolka<
             // Widened for iteration: an optional locale makes the entry an
             // intersection of mapped types, which cannot be indexed by the
             // full locale union while those are still generic.
-            const entries: Record<
-                string,
-                Partial<Record<string, Leaf>>
-            > = dictionary.content;
+            const entries: Record<string, unknown> = dictionary.content;
             const source = dictionary.meta?.source;
-            const content: Record<string, unknown> = {};
 
-            for (const [key, byLocale] of Object.entries(entries)) {
+            function resolveNode(
+                node: Record<string, unknown>,
+                path: string
+            ): Record<string, unknown> {
+                const content: Record<string, unknown> = {};
+
+                for (const [name, value] of Object.entries(node)) {
+                    // A group's key contributes a path segment and nothing
+                    // else; only a locale map produces copy.
+                    const key = path ? `${path}.${name}` : name;
+                    if (typeof value !== "object" || value === null) {
+                        continue;
+                    }
+                    const child: Record<string, unknown> = { ...value };
+
+                    if (!isLocaleMap(child)) {
+                        content[name] = resolveNode(child, key);
+                        continue;
+                    }
+
+                    content[name] = resolveEntry(key, child);
+                }
+
+                return content;
+            }
+
+            function resolveEntry(
+                key: string,
+                byLocale: Partial<Record<string, Leaf>>
+            ): unknown {
                 const info: ErrorInfo = { key, locale, message: "" };
 
                 // Exactly one hop, to the default locale, which is always
@@ -371,16 +401,14 @@ export function createTolka<
                     );
                 } catch (error) {
                     report(error, { ...info, message: reference });
-                    content[key] = message;
-                    continue;
+                    return message;
                 }
 
                 if (isLiteral(referenceFormatter)) {
-                    content[key] = message;
-                    continue;
+                    return message;
                 }
 
-                content[key] = (args: FormatValues) => {
+                return (args: FormatValues) => {
                     try {
                         return formatterFor(message, locale).format<ReactNode>(
                             args
@@ -393,7 +421,9 @@ export function createTolka<
                 };
             }
 
-            return { content: sealResolved<C, D>(content) };
+            return {
+                content: sealResolved<C, D>(resolveNode(entries, "")),
+            };
         },
 
         formatMessage(message, locale, params) {

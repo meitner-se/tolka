@@ -83,11 +83,62 @@ export type Variant = {
     message: string;
 };
 
+/**
+ * A node is a group when some child is itself a record; everything else is a
+ * locale map. Asking it in that direction rather than "does any value look
+ * like copy" matters for the empty node: a key absent from every locale must
+ * stay a locale map so it is *reported*, since rendering nothing is the
+ * failure this library exists to avoid. A group with no branches would mean
+ * nothing anyway.
+ *
+ * A plugin tag is an object too, so it is excluded by its `__tag`.
+ */
+export function isLocaleMap(
+    node: Record<string, unknown>
+): node is Record<string, Leaf> {
+    return !Object.values(node).some(
+        (value) =>
+            typeof value === "object" && value !== null && !("__tag" in value)
+    );
+}
+
+/** Anything that can hold copy or further keys. */
+function isNode(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+/**
+ * Groups collapse to dotted paths, so every check below stays a per-key check
+ * and a finding names the path an author would read (`sectionType.Program`).
+ */
+export function flattenContent(
+    content: Record<string, unknown>,
+    path = ""
+): Record<string, Record<string, Leaf>> {
+    const flat: Record<string, Record<string, Leaf>> = {};
+
+    for (const [name, value] of Object.entries(content)) {
+        const key = path ? `${path}.${name}` : name;
+        if (!isNode(value)) {
+            continue;
+        }
+        const child = value;
+
+        if (isLocaleMap(child)) {
+            flat[key] = child;
+            continue;
+        }
+        Object.assign(flat, flattenContent(child, key));
+    }
+
+    return flat;
+}
+
 /** Every renderable form of every key, which is what rules are given. */
 export function variantsOf(
-    content: Record<string, Record<string, Leaf>>
+    content: Record<string, unknown>
 ): { key: string; variants: Variant[] }[] {
-    return Object.entries(content).map(([key, byLocale]) => ({
+    return Object.entries(flattenContent(content)).map(([key, byLocale]) => ({
         key,
         variants: Object.entries(byLocale).flatMap(([locale, leaf]) =>
             variants(leaf).map(([suffix, message]) => ({
@@ -120,7 +171,7 @@ function variants(leaf: Leaf): [string, string][] {
  * a placeholder would otherwise make that type a lie in one language only.
  */
 export function checkDictionary(
-    content: Record<string, Record<string, Leaf>>,
+    content: Record<string, unknown>,
     locale: string,
     source?: string,
     declaredLocales?: readonly string[]
@@ -128,7 +179,7 @@ export function checkDictionary(
     const findings: Finding[] = [];
     const declared = declaredLocales && new Set(declaredLocales);
 
-    for (const [key, byLocale] of Object.entries(content)) {
+    for (const [key, byLocale] of Object.entries(flattenContent(content))) {
         // An undeclared locale key cannot be caught by the content type --
         // excess properties go unchecked in that generic constraint position --
         // so a typo would otherwise be silently ignored at runtime.
@@ -240,15 +291,18 @@ export type LocaleCoverage = {
  * the locale becomes required and the compiler takes over.
  */
 export function localeCoverage(
-    content: Record<string, Partial<Record<string, Leaf>>>,
+    content: Record<string, unknown>,
     locales: readonly string[]
 ): Record<string, LocaleCoverage> {
-    const total = Object.keys(content).length;
+    // Coverage counts keys that carry copy, so a group contributes its
+    // branches and not itself.
+    const flat = flattenContent(content);
+    const total = Object.keys(flat).length;
     const coverage: Record<string, LocaleCoverage> = {};
 
     for (const locale of locales) {
         let present = 0;
-        for (const byLocale of Object.values(content)) {
+        for (const byLocale of Object.values(flat)) {
             if (byLocale[locale] !== undefined) {
                 present += 1;
             }
