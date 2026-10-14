@@ -222,6 +222,37 @@ describe("groups", () => {
         expect(findings[0]?.key).toBe("group.branch");
     });
 
+    it("keeps a group and a literal dotted key that share a label", () => {
+        // `"section.Program"` is a legal key, and it reads the same as the
+        // group's path. Keyed by that label one would overwrite the other and
+        // vanish from checking -- a silent gap in a gate the derived types
+        // rest on.
+        const findings = checkDictionary(
+            {
+                "section.Program": { sv: "{a}", en: "{b}" },
+                section: { Program: { sv: "{c}", en: "{d}" } },
+            },
+            "sv"
+        );
+
+        expect(findings).toHaveLength(2);
+        expect(
+            findings.every((finding) => finding.key === "section.Program")
+        ).toBe(true);
+    });
+
+    it("counts both of those towards coverage", () => {
+        const coverage = localeCoverage(
+            {
+                "section.Program": { sv: "x", en: "y" },
+                section: { Program: { sv: "x", en: "y" } },
+            },
+            ["sv"]
+        );
+
+        expect(coverage["sv"]?.total).toBe(2);
+    });
+
     it("skips a key whose value is not a node at all", () => {
         // Same degraded shape the runtime guards against; flattening must not
         // walk into a primitive.

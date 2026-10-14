@@ -107,15 +107,24 @@ function isNode(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
 
+/** One key that carries copy, labelled by the path an author would read. */
+export type FlatEntry = { key: string; byLocale: Record<string, Leaf> };
+
 /**
  * Groups collapse to dotted paths, so every check below stays a per-key check
  * and a finding names the path an author would read (`sectionType.Program`).
+ *
+ * A list rather than a record keyed by that path: the path is a *label*, and
+ * two distinct keys can share one -- a literal `"section.Program"` beside a
+ * group `section: { Program }`. Keyed, the second would overwrite the first
+ * and drop it from checking and coverage silently, which for a gate the
+ * derived types rest on is the worst way to fail.
  */
 export function flattenContent(
     content: Record<string, unknown>,
     path = ""
-): Record<string, Record<string, Leaf>> {
-    const flat: Record<string, Record<string, Leaf>> = {};
+): FlatEntry[] {
+    const flat: FlatEntry[] = [];
 
     for (const [name, value] of Object.entries(content)) {
         const key = path ? `${path}.${name}` : name;
@@ -125,10 +134,10 @@ export function flattenContent(
         const child = value;
 
         if (isLocaleMap(child)) {
-            flat[key] = child;
+            flat.push({ key, byLocale: child });
             continue;
         }
-        Object.assign(flat, flattenContent(child, key));
+        flat.push(...flattenContent(child, key));
     }
 
     return flat;
@@ -138,7 +147,7 @@ export function flattenContent(
 export function variantsOf(
     content: Record<string, unknown>
 ): { key: string; variants: Variant[] }[] {
-    return Object.entries(flattenContent(content)).map(([key, byLocale]) => ({
+    return flattenContent(content).map(({ key, byLocale }) => ({
         key,
         variants: Object.entries(byLocale).flatMap(([locale, leaf]) =>
             variants(leaf).map(([suffix, message]) => ({
@@ -179,7 +188,7 @@ export function checkDictionary(
     const findings: Finding[] = [];
     const declared = declaredLocales && new Set(declaredLocales);
 
-    for (const [key, byLocale] of Object.entries(flattenContent(content))) {
+    for (const { key, byLocale } of flattenContent(content)) {
         // An undeclared locale key cannot be caught by the content type --
         // excess properties go unchecked in that generic constraint position --
         // so a typo would otherwise be silently ignored at runtime.
@@ -297,12 +306,12 @@ export function localeCoverage(
     // Coverage counts keys that carry copy, so a group contributes its
     // branches and not itself.
     const flat = flattenContent(content);
-    const total = Object.keys(flat).length;
+    const total = flat.length;
     const coverage: Record<string, LocaleCoverage> = {};
 
     for (const locale of locales) {
         let present = 0;
-        for (const byLocale of Object.values(flat)) {
+        for (const { byLocale } of flat) {
             if (byLocale[locale] !== undefined) {
                 present += 1;
             }
