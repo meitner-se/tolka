@@ -222,6 +222,12 @@ describe("groups", () => {
         expect(findings[0]?.key).toBe("group.branch");
     });
 
+    it("skips a key whose value is not a node at all", () => {
+        // Same degraded shape the runtime guards against; flattening must not
+        // walk into a primitive.
+        expect(checkDictionary({ stray: "oops" }, "sv")).toEqual([]);
+    });
+
     it("counts branches, not groups, towards coverage", () => {
         const coverage = localeCoverage(
             {

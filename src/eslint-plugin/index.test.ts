@@ -112,6 +112,15 @@ describe("content-depth", () => {
                     code: `tolka.createDictionary({ content: { a: { b: { c: { d: { sv: "x" } } } } } });`,
                     options: [{ max: 3 }],
                 },
+                {
+                    // A group whose siblings are not groups: the walk steps
+                    // over them rather than counting them as depth.
+                    code: `tolka.createDictionary({ content: { group: { branch: { sv: "x" }, stray: "y", ...rest } } });`,
+                },
+                {
+                    // No content object at all.
+                    code: `tolka.createDictionary({});`,
+                },
             ],
             invalid: [
                 {

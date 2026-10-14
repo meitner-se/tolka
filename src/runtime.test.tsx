@@ -760,6 +760,20 @@ describe("groups", () => {
         expect(terse.tagged.Program).toBe("Prog");
     });
 
+    it("skips a key whose value is not a node at all", () => {
+        // Only reachable from untyped data: the content type admits a locale
+        // map or a group, never a bare string. The walk must not treat it as
+        // either rather than throwing on a spread of a primitive.
+        const malformed = { content: { stray: "oops" } } as never;
+
+        const { content } = tolka.resolveDictionary(malformed, {
+            locale: "sv",
+            state: { tone: "formal" },
+        });
+
+        expect(Object.keys(content)).toEqual([]);
+    });
+
     it("reports an absent key inside a group by its path", () => {
         const onError = vi.fn();
         const reporting = setup(onError);
@@ -774,7 +788,11 @@ describe("groups", () => {
             state: { tone: "formal" },
         });
 
-        expect((content as Record<string, Record<string, unknown>>)["group"]?.["branch"]).toBe("");
+        expect(
+            (content as Record<string, Record<string, unknown>>)["group"]?.[
+                "branch"
+            ]
+        ).toBe("");
         expect(String(onError.mock.calls[0]?.[0])).toContain("group.branch");
     });
 });
