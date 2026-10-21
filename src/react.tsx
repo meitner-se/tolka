@@ -13,6 +13,7 @@ import type { Tolka } from "./runtime.js";
 import type {
     AnyDictionary,
     AnyPlugin,
+    ChainGuard,
     Content,
     Dictionary,
     Extended,
@@ -174,6 +175,7 @@ export function createReactBindings<
         E extends readonly AnyDictionary[] = [],
     >(
         dictionary: Dictionary<C, E> &
+            ChainGuard<L, R, E> &
             ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
                 ? unknown
                 : never)

@@ -274,14 +274,23 @@ content.categoryStudent; // the one it extends
 ```
 
 `extends` composes: a dictionary that extends one which itself extends another
-resolves all three. The chain is bounded at three hops in the types, because
-anything longer is the namespace tree colocated dictionaries exist to replace.
+resolves all three. The chain is bounded at four hops, because anything longer
+is the namespace tree colocated dictionaries exist to replace.
 
 **Two dictionaries in one resolution may not define the same key.** It is a
 compile error naming the key and both sides — `content`, or the position in
 `extends` — because a silent last-wins would publish the wrong copy with
 nothing to catch it. A dictionary's plugin tags come along too, so a config
-that does not register them still refuses to resolve it.
+that does not register them still refuses to resolve it, however many hops down
+the copy that needs them lives.
+
+Anything the compiler cannot read end to end is refused rather than resolved
+anyway, because every one of those checks is derived from the chain — a hop it
+cannot see does not fail a check, it quietly drops one. So `extends` wants an
+array literal at the call (a hoisted array hides which dictionaries are in it),
+a chain past four hops is a compile error rather than a silent truncation, and
+a dictionary built for a different locale set cannot be extended in, even one
+hop below an empty wrapper.
 
 Extending copies nothing. `content` holds a dictionary's own keys and only
 those, so `runConsistencyChecks`, your coverage ratios and any audit count each

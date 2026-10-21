@@ -958,8 +958,9 @@ describe("extends", () => {
     });
 
     it("refuses a collision the compiler could not see", () => {
-        // A JavaScript caller, or a chain deeper than the type's bound. Last
-        // wins would publish the wrong copy with nothing to catch it.
+        // A JavaScript caller: the types refuse every chain they cannot read
+        // end to end, so this is the one way left in. Last wins would publish
+        // the wrong copy with nothing to catch it.
         const shared = tolka.createDictionary({
             content: { title: { sv: "Delad", en: "Shared" } },
         });

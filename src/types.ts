@@ -296,11 +296,15 @@ export interface Dictionary<C, E extends readonly AnyDictionary[] = []> {
 /**
  * Counts an `extends` chain down to zero, for the reason `Down` counts content
  * depth: unbounded conditional recursion is what TypeScript 5.6 and 5.7 reject
- * with TS2589. Three hops is far past what the model is for -- `extends`
+ * with TS2589. Four hops is far past what the model is for -- `extends`
  * composes small units, and a chain longer than that is the namespace tree
- * colocated dictionaries replace. Past the bound a deeper key is simply absent
- * from the type, so reading one fails to compile rather than resolving to
- * something unproven; the runtime walk is not bounded at all.
+ * colocated dictionaries replace.
+ *
+ * `ChainProblems` counts with the same ladder, so a dictionary is refused at
+ * exactly the hop where this walk would start dropping content. Truncating
+ * quietly was the original mistake: it left the fifth hop's plugin tags out of
+ * the capability check, which made a config that lacked them accept the
+ * dictionary rather than reject it. The runtime walk is not bounded at all.
  */
 type ChainDown = [never, 0, 1, 2];
 
@@ -357,7 +361,7 @@ type Describe<
     All,
     At extends number,
 > = Keys extends string
-    ? `"${Keys}" is defined by both ${OwnerOf<Keys, Own, All>} and extends[${At}]`
+    ? `"${Keys}" is defined by both ${OwnerOf<Keys, Own, All>} and extends[${At}], so which copy a component gets would be a coin toss -- rename it, or drop one of them`
     : never;
 
 /**
@@ -381,34 +385,86 @@ type Walk<
           | Walk<Own, All, Tail, Seen | KeysOf<Head>, [...I, unknown]>
     : never;
 
-export type ExtendsCollision<Detail extends string> = {
-    __tolkaError: "extends: two dictionaries define the same key, so which copy a component gets would be a coin toss. Rename the key, or drop one of them.";
-    collision: Detail;
+export type ExtendsProblem<Detail extends string> = {
+    __tolkaError: "extends: this dictionary cannot be resolved as written. `problem` says what is wrong; every check here fails loudly rather than quietly resolving something it could not prove.";
+    problem: Detail;
 };
 
 type GuardFrom<Detail extends string> = [Detail] extends [never]
     ? unknown
-    : ExtendsCollision<Detail>;
+    : ExtendsProblem<Detail>;
 
 /**
- * `unknown` when nothing collides, so the definition is accepted unchanged;
- * otherwise a shape no object literal can satisfy, which is what turns a
- * collision into a compile error rather than a silent last-wins.
+ * Whether the chain is one the type can read end to end.
+ *
+ * A chain it cannot read has to be refused rather than shrugged at. Every
+ * capability this feature rests on -- which plugin tags the copy uses, which
+ * locales it covers, which keys collide -- is derived from `Extended`, so a
+ * hop the walk cannot see does not fail the check, it *weakens* it: the tags
+ * of a dictionary beyond the bound simply stop being required, and a config
+ * missing their plugin resolves it anyway.
  */
-export type ExtendsGuard<C, E> = GuardFrom<
-    Walk<Extract<keyof C, string>, E, E, Extract<keyof C, string>, []>
+type ChainProblems<
+    L extends string,
+    R extends L,
+    E,
+    N extends 0 | 1 | 2 | 3 = 3,
+> = E extends readonly [infer Head, ...infer Rest]
+    ? HeadProblem<L, R, Head, N> | ChainProblems<L, R, Rest, N>
+    : [E] extends [readonly []]
+      ? never
+      : "`extends` must be an array literal at the call, so the compiler can see which dictionaries are in it -- a hoisted array hides them, and what it hides stops being checked";
+
+/**
+ * The locale proof lives here rather than in the constraint on `extends`.
+ *
+ * As a constraint it only reached the immediate elements, so a wrapper with
+ * empty content let a foreign locale set through one hop below it. Carrying it
+ * down the same walk reaches every hop -- and keeps the message accurate,
+ * because a constraint that fails makes inference fall back to the constraint
+ * itself, which then reports whatever is wrong with *that* instead.
+ */
+type HeadProblem<L extends string, R extends L, D, N extends 0 | 1 | 2 | 3> =
+    D extends Dictionary<infer C, infer E>
+        ?
+              | (C extends Content<L, R>
+                    ? never
+                    : "an extended dictionary's content is not valid for this config's locales -- it was built for a different locale set")
+              | (N extends 0
+                    ? [E] extends [readonly []]
+                        ? never
+                        : "an `extends` chain runs further than four hops, which is further than the types can prove -- compose shallower units instead"
+                    : ChainProblems<L, R, E, ChainDown[N]>)
+        : never;
+
+/**
+ * `unknown` when there is nothing to refuse, so the definition is accepted
+ * unchanged; otherwise a shape no object literal can satisfy.
+ */
+export type ExtendsGuard<L extends string, R extends L, C, E> = GuardFrom<
+    | ChainProblems<L, R, E>
+    | Walk<Extract<keyof C, string>, E, E, Extract<keyof C, string>, []>
+>;
+
+/**
+ * The same proof minus the collisions, for the resolution paths: a dictionary
+ * built by `createDictionary` already had those refused, but nothing
+ * guarantees the chain in front of a resolver came from there.
+ */
+export type ChainGuard<L extends string, R extends L, E> = GuardFrom<
+    ChainProblems<L, R, E>
 >;
 
 /**
  * What `extends` accepts: a dictionary this config could already resolve on
- * its own. Constraining the content here rather than taking `AnyDictionary` is
- * what keeps a dictionary built for another locale set from being absorbed
- * into one that promises those locales.
+ * its own, all the way down. The guards prove this per hop rather than
+ * constraining `extends` to it -- see `HeadProblem` -- so this is the shape
+ * they prove, and the one to name when typing a helper that takes dictionaries.
  */
-export type Extendable<L extends string, R extends L = L> = Dictionary<
-    Content<L, R>,
-    readonly AnyDictionary[]
->;
+export interface Extendable<
+    L extends string,
+    R extends L = L,
+> extends Dictionary<Content<L, R>, readonly Extendable<L, R>[]> {}
 
 /**
  * Probing with the default locale, rather than key names, is what keeps a

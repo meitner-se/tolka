@@ -5,13 +5,13 @@ import type { ReactNode } from "react";
 import { IntlMessageFormat } from "intl-messageformat";
 
 import type {
-    AnyDictionary,
     AnyPlugin,
     Plugin,
     Content,
     Dictionary,
     DictionaryMeta,
-    Extendable,
+    AnyDictionary,
+    ChainGuard,
     Extended,
     ExtendsGuard,
     LocaleDef,
@@ -102,7 +102,7 @@ export interface Tolka<
 
     createDictionary<
         const C extends Content<L, R>,
-        const E extends readonly Extendable<L, R>[] = [],
+        const E extends readonly AnyDictionary[] = [],
     >(
         definition: {
             /**
@@ -111,23 +111,27 @@ export interface Tolka<
              * component reads one dictionary while coverage, the consistency
              * checks and the audit still see each key once, where it is
              * defined.
+             *
+             * `| undefined` matches what `Dictionary` declares, so an
+             * existing one is still accepted back here under
+             * `exactOptionalPropertyTypes`.
              */
-            extends?: E;
+            extends?: E | undefined;
             content: C;
             meta?: DictionaryMeta | undefined;
-        } & ExtendsGuard<C, E>
+        } & ExtendsGuard<L, R, C, E>
     ): Dictionary<C, E>;
 
     /**
-     * A dictionary may only be resolved by a config registering all its tags --
-     * the extended dictionaries' tags included, since their copy is what comes
-     * back.
+     * A dictionary may only be resolved by a config registering all its tags,
+     * the extended dictionaries' included: their copy is what comes back.
      */
     resolveDictionary<
         C extends Content<L, R>,
         E extends readonly AnyDictionary[] = [],
     >(
         dictionary: Dictionary<C, E> &
+            ChainGuard<L, R, E> &
             ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
                 ? unknown
                 : never),
@@ -357,6 +361,7 @@ export function createTolka<
             E extends readonly AnyDictionary[] = [],
         >(
             dictionary: Dictionary<C, E> &
+                ChainGuard<AllLocales, RequiredLocales, E> &
                 ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
                     ? unknown
                     : never),
@@ -455,10 +460,9 @@ export function createTolka<
                 };
             }
 
-            // Each extended dictionary contributes its own keys, its own
-            // `meta.source` and nothing else. The compiler has already proved
-            // the key sets disjoint, so the order here settles nothing -- it
-            // is a tie-break for a chain too deep for the type to reach.
+            // Each extended dictionary contributes its own keys and its own
+            // `meta.source`. The compiler proved the key sets disjoint, so
+            // order settles nothing here; it is a tie-break for a JS caller.
             const content: Record<string, unknown> = {};
             for (const member of extendsChain(dictionary)) {
                 Object.assign(

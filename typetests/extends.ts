@@ -1,4 +1,10 @@
-import type { ExtendsCollision, ExtendsGuard, Tagged } from "../src/index.js";
+import type {
+    ChainGuard,
+    Dictionary,
+    ExtendsGuard,
+    ExtendsProblem,
+    Tagged,
+} from "../src/index.js";
 
 /**
  * `extends` is the sanctioned form of what the `static-content` rule blocks
@@ -15,11 +21,18 @@ const tonePlugin = definePlugin({
         value.states[axis] ?? value.states.default,
 });
 
+/** The sentence every unprovable `extends` is branded with. */
+const BRAND =
+    "extends: this dictionary cannot be resolved as written. `problem` says what is wrong; every check here fails loudly rather than quietly resolving something it could not prove." as const;
+
 const tolka = createTolka({
     locales: ["sv", "en"] as const,
     defaultLocale: "sv",
     plugins: [tonePlugin] as const,
 });
+
+/** This file's configs all declare the same locales. */
+type Locales = "sv" | "en";
 
 const plain = createTolka({
     locales: ["sv", "en"] as const,
@@ -128,41 +141,43 @@ tolka.createDictionary({
  * this rule exists to make legible.
  */
 type OwnCollision = ExtendsGuard<
+    Locales,
+    Locales,
     { categoryStudent: Record<"sv" | "en", string> },
     readonly [typeof userCategoryLabels]
 >;
 const ownCollision: OwnCollision = {
-    __tolkaError:
-        "extends: two dictionaries define the same key, so which copy a component gets would be a coin toss. Rename the key, or drop one of them.",
-    collision: '"categoryStudent" is defined by both content and extends[0]',
+    __tolkaError: BRAND,
+    problem:
+        '"categoryStudent" is defined by both content and extends[0], so which copy a component gets would be a coin toss -- rename it, or drop one of them',
 };
 void ownCollision;
 
 type BetweenCollision = ExtendsGuard<
+    Locales,
+    Locales,
     { own: Record<"sv" | "en", string> },
     readonly [typeof base, typeof middle]
 >;
 const betweenCollision: BetweenCollision = {
-    __tolkaError:
-        "extends: two dictionaries define the same key, so which copy a component gets would be a coin toss. Rename the key, or drop one of them.",
-    collision: '"fromBase" is defined by both extends[0] and extends[1]',
+    __tolkaError: BRAND,
+    problem:
+        '"fromBase" is defined by both extends[0] and extends[1], so which copy a component gets would be a coin toss -- rename it, or drop one of them',
 };
 void betweenCollision;
 
 // A dictionary with nothing to collide with is accepted unchanged.
 const noCollision: ExtendsGuard<
+    Locales,
+    Locales,
     { own: Record<"sv" | "en", string> },
     readonly [typeof base]
 > = "anything goes, the guard is `unknown`";
 void noCollision;
 
-// The guard is the only thing that can satisfy itself, which is what makes a
-// collision unignorable rather than merely noisy.
-const spelled: ExtendsCollision<"x"> = {
-    __tolkaError:
-        "extends: two dictionaries define the same key, so which copy a component gets would be a coin toss. Rename the key, or drop one of them.",
-    collision: "x",
-};
+// The guard is the only thing that can satisfy itself, which is what makes an
+// unprovable `extends` unignorable rather than merely noisy.
+const spelled: ExtendsProblem<"x"> = { __tolkaError: BRAND, problem: "x" };
 void spelled;
 
 // ---- tags union into the capability check
@@ -198,8 +213,119 @@ const swedishOnly = createTolka({
     plugins: [] as const,
 }).createDictionary({ content: { only: { sv: "Bara svenska" } } });
 
+// @ts-expect-error `only` has no `en`, which this config requires
 tolka.createDictionary({
-    // @ts-expect-error `only` has no `en`, which this config requires
     extends: [swedishOnly],
     content: { own: { sv: "Egen", en: "Own" } },
 });
+
+type ForeignLocales = ChainGuard<
+    Locales,
+    Locales,
+    readonly [typeof swedishOnly]
+>;
+const foreignLocales: ForeignLocales = {
+    __tolkaError: BRAND,
+    problem:
+        "an extended dictionary's content is not valid for this config's locales -- it was built for a different locale set",
+};
+void foreignLocales;
+
+// ---- a chain the type cannot read is refused, not resolved anyway
+//
+// Every capability check here is derived from `Extended`. A hop the walk
+// cannot see does not fail the check, it weakens it -- so each of these used
+// to compile, and `plain` resolved a dictionary whose copy wanted `tone`.
+
+const hoisted = [tagged];
+
+// @ts-expect-error a hoisted array hides which dictionaries are in it
+tolka.createDictionary({
+    extends: hoisted,
+    content: { own: { sv: "Egen", en: "Own" } },
+});
+
+type HoistedProblem = ChainGuard<Locales, Locales, typeof hoisted>;
+const hoistedProblem: HoistedProblem = {
+    __tolkaError: BRAND,
+    problem:
+        "`extends` must be an array literal at the call, so the compiler can see which dictionaries are in it -- a hoisted array hides them, and what it hides stops being checked",
+};
+void hoistedProblem;
+
+const hop1 = tolka.createDictionary({
+    extends: [tagged],
+    content: { hop1: { sv: "A", en: "A" } },
+});
+const hop2 = tolka.createDictionary({
+    extends: [hop1],
+    content: { hop2: { sv: "A", en: "A" } },
+});
+const hop3 = tolka.createDictionary({
+    extends: [hop2],
+    content: { hop3: { sv: "A", en: "A" } },
+});
+
+const hop4 = tolka.createDictionary({
+    extends: [hop3],
+    content: { hop4: { sv: "A", en: "A" } },
+});
+
+// Four hops is the bound, and the tag four hops down is still required.
+// @ts-expect-error this config registers no `tone` plugin
+plain.resolveDictionary(hop4, { locale: "sv", state: {} });
+
+const atTheBound: string = tolka.resolveDictionary(hop4, {
+    locale: "sv",
+    state: { tone: "formal" },
+}).content.greeting;
+void atTheBound;
+
+// @ts-expect-error the fifth hop is further than the types can prove
+tolka.createDictionary({
+    extends: [hop4],
+    content: { hop5: { sv: "A", en: "A" } },
+});
+
+type TooDeep = ChainGuard<Locales, Locales, readonly [typeof hop4]>;
+const tooDeep: TooDeep = {
+    __tolkaError: BRAND,
+    problem:
+        "an `extends` chain runs further than four hops, which is further than the types can prove -- compose shallower units instead",
+};
+void tooDeep;
+
+// ---- a foreign locale set cannot hide one hop down
+
+const swedishWrapper = createTolka({
+    locales: ["sv"] as const,
+    defaultLocale: "sv",
+    plugins: [] as const,
+}).createDictionary({ extends: [swedishOnly], content: {} });
+
+// @ts-expect-error `only` has no `en`, one hop below an empty wrapper
+tolka.createDictionary({
+    extends: [swedishWrapper],
+    content: { own: { sv: "Egen", en: "Own" } },
+});
+
+tolka.resolveDictionary(
+    // @ts-expect-error the wrapper's chain is not valid for this config
+    swedishWrapper,
+    { locale: "en", state: { tone: "formal" } }
+);
+
+function WrapperReader(): null {
+    // @ts-expect-error the same chain, refused on the hook path too
+    useDictionary(swedishWrapper);
+    return null;
+}
+void WrapperReader;
+
+// ---- a dictionary round-trips through createDictionary
+
+declare const alreadyBuilt: Dictionary<{ built: Record<Locales, string> }>;
+
+// `Dictionary` declares `extends?: E | undefined`, so under
+// `exactOptionalPropertyTypes` the input has to admit the same shape.
+tolka.createDictionary(alreadyBuilt);

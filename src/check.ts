@@ -174,8 +174,9 @@ function isDictionaryNode(value: unknown): value is DictionaryNode {
  *
  * Order is only a tie-break for a collision the compiler already refuses. It
  * decides nothing for a dictionary that compiles, and the `seen` set is there
- * for the same reason: a cycle cannot be written with `const` bindings, but a
- * circular import can hand one over half-built.
+ * for the same reason: a cycle cannot be written with `const` bindings, and
+ * the types refuse a chain they cannot read end to end, but a circular import
+ * can still hand one over half-built.
  */
 export function extendsChain(dictionary: unknown): ChainMember[] {
     const chain: ChainMember[] = [];
@@ -203,8 +204,8 @@ export function extendsChain(dictionary: unknown): ChainMember[] {
  * Two of a resolution's dictionaries defining the same top-level key.
  *
  * The compiler refuses this at `createDictionary`, so this is the net under a
- * JavaScript caller and under a chain deeper than the type's bound -- the one
- * case where a collision would otherwise go unproven and silently last-wins.
+ * JavaScript caller -- the one case left where a collision would otherwise go
+ * unproven and silently last-wins.
  *
  * Top-level keys only, which is exactly what a resolution merges: two
  * dictionaries that both define the group `errors` would lose one side's
