@@ -10,6 +10,10 @@ import type {
     Content,
     Dictionary,
     DictionaryMeta,
+    AnyDictionary,
+    ChainGuard,
+    Extended,
+    ExtendsGuard,
     LocaleDef,
     LocaleInput,
     LocalesOf,
@@ -24,6 +28,8 @@ import type {
 
 import {
     checkDictionary,
+    checkExtends,
+    extendsChain,
     formatFindings,
     isLocaleMap,
     type Finding,
@@ -94,17 +100,43 @@ export interface Tolka<
     defaultLocale: D;
     plugins: P;
 
-    createDictionary<const C extends Content<L, R>>(definition: {
-        content: C;
-        meta?: DictionaryMeta | undefined;
-    }): Dictionary<C>;
+    createDictionary<
+        const C extends Content<L, R>,
+        const E extends readonly AnyDictionary[] = [],
+    >(
+        definition: {
+            /**
+             * Dictionaries this one also resolves. Their keys arrive on
+             * `content` at resolution without being copied into it, so a
+             * component reads one dictionary while coverage, the consistency
+             * checks and the audit still see each key once, where it is
+             * defined.
+             *
+             * `| undefined` matches what `Dictionary` declares, so an
+             * existing one is still accepted back here under
+             * `exactOptionalPropertyTypes`.
+             */
+            extends?: E | undefined;
+            content: C;
+            meta?: DictionaryMeta | undefined;
+        } & ExtendsGuard<L, R, C, E>
+    ): Dictionary<C, E>;
 
-    /** A dictionary may only be resolved by a config registering all its tags. */
-    resolveDictionary<C extends Content<L, R>>(
-        dictionary: Dictionary<C> &
-            ([TagsUsed<C>] extends [P[number]["tag"]] ? unknown : never),
+    /**
+     * A dictionary may only be resolved by a config registering all its tags,
+     * the extended dictionaries' included: their copy is what comes back.
+     */
+    resolveDictionary<
+        C extends Content<L, R>,
+        E extends readonly AnyDictionary[] = [],
+    >(
+        dictionary: Dictionary<C, E> &
+            ChainGuard<L, R, E> &
+            ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
+                ? unknown
+                : never),
         options: { locale: L; state: StateFromPlugins<P> }
-    ): { content: Resolved<C, D> };
+    ): { content: Resolved<Extended<C, E>, D> };
 
     /** The stage-3 primitive, for a message that did not come from a dictionary. */
     formatMessage(message: string, locale: L, params?: FormatValues): unknown;
@@ -303,12 +335,16 @@ export function createTolka<
         plugins: config.plugins,
 
         createDictionary(definition) {
-            const findings: Finding[] = checkDictionary(
-                definition.content,
-                config.defaultLocale,
-                definition.meta?.source,
-                codes
-            );
+            const source = definition.meta?.source;
+            const findings: Finding[] = [
+                ...checkDictionary(
+                    definition.content,
+                    config.defaultLocale,
+                    source,
+                    codes
+                ),
+                ...checkExtends(definition, source),
+            ];
             if (findings.length) {
                 // Loud in dev and CI; a copy typo must never crash production.
                 const summary = `tolka: inconsistent dictionary\n${formatFindings(findings)}`;
@@ -320,21 +356,23 @@ export function createTolka<
             return definition;
         },
 
-        resolveDictionary<C extends Content<AllLocales, RequiredLocales>>(
-            dictionary: Dictionary<C> &
-                ([TagsUsed<C>] extends [P[number]["tag"]] ? unknown : never),
+        resolveDictionary<
+            C extends Content<AllLocales, RequiredLocales>,
+            E extends readonly AnyDictionary[] = [],
+        >(
+            dictionary: Dictionary<C, E> &
+                ChainGuard<AllLocales, RequiredLocales, E> &
+                ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
+                    ? unknown
+                    : never),
             options: { locale: AllLocales; state: StateFromPlugins<P> }
-        ): { content: Resolved<C, D> } {
+        ): { content: Resolved<Extended<C, E>, D> } {
             const { locale, state } = options;
-            // Widened for iteration: an optional locale makes the entry an
-            // intersection of mapped types, which cannot be indexed by the
-            // full locale union while those are still generic.
-            const entries: Record<string, unknown> = dictionary.content;
-            const source = dictionary.meta?.source;
 
             function resolveNode(
                 node: Record<string, unknown>,
-                path: string
+                path: string,
+                source: string | undefined
             ): Record<string, unknown> {
                 const content: Record<string, unknown> = {};
 
@@ -348,11 +386,11 @@ export function createTolka<
                     const child: Record<string, unknown> = { ...value };
 
                     if (!isLocaleMap(child)) {
-                        content[name] = resolveNode(child, key);
+                        content[name] = resolveNode(child, key, source);
                         continue;
                     }
 
-                    content[name] = resolveEntry(key, child);
+                    content[name] = resolveEntry(key, child, source);
                 }
 
                 return content;
@@ -360,7 +398,8 @@ export function createTolka<
 
             function resolveEntry(
                 key: string,
-                byLocale: Partial<Record<string, Leaf>>
+                byLocale: Partial<Record<string, Leaf>>,
+                source: string | undefined
             ): unknown {
                 const info: ErrorInfo = { key, locale, message: "" };
 
@@ -421,8 +460,23 @@ export function createTolka<
                 };
             }
 
+            // Each extended dictionary contributes its own keys and its own
+            // `meta.source`. The compiler proved the key sets disjoint, so
+            // order settles nothing here; it is a tie-break for a JS caller.
+            const content: Record<string, unknown> = {};
+            for (const member of extendsChain(dictionary)) {
+                Object.assign(
+                    content,
+                    resolveNode(
+                        member.dictionary.content,
+                        "",
+                        member.dictionary.meta?.source
+                    )
+                );
+            }
+
             return {
-                content: sealResolved<C, D>(resolveNode(entries, "")),
+                content: sealResolved<Extended<C, E>, D>(content),
             };
         },
 

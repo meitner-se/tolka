@@ -281,3 +281,61 @@ describe("nested tag renderers", () => {
         expect(renderNested().keyWarnings).toBe(0);
     });
 });
+
+describe("useDictionary and extends", () => {
+    const categories = tolka.createDictionary({
+        content: {
+            categoryStudent: { sv: "Elev", en: "Student" },
+            richShared: {
+                sv: "Ta bort <b>{name}</b>",
+                en: "Delete <b>{name}</b>",
+            },
+        },
+    });
+
+    const dropdown = tolka.createDictionary({
+        extends: [categories],
+        content: { placeholder: { sv: "Välj", en: "Pick" } },
+    });
+
+    function Dropdown(): ReactNode {
+        const { content } = useDictionary(dropdown);
+        return (
+            <p>
+                {content.placeholder}
+                {content.categoryStudent}
+                {content.richShared({ name: "Ada", b: bold })}
+            </p>
+        );
+    }
+
+    it("resolves a dictionary and the ones it extends in one call", () => {
+        expect(render(<Dropdown />, "sv", "casual")).toBe(
+            "<p>VäljElevTa bort <strong>Ada</strong></p>"
+        );
+    });
+
+    it("wraps a formatter that came from an extended dictionary", () => {
+        // `wrapFormatters` runs over the merged content, so an extended key's
+        // tag renderer is keyed like any other rather than warning at render.
+        const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+        render(<Dropdown />, "en", "casual");
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
+    it("merges the extended dictionaries first and the dictionary itself last", () => {
+        // Order settles nothing for a dictionary that compiles -- the key
+        // sets are proven disjoint -- but it is the tie-break under a chain
+        // too deep for the type to reach, so it is worth pinning.
+        const { content } = tolka.resolveDictionary(dropdown, {
+            locale: "sv",
+            state: { tone: "casual" },
+        });
+        expect(Object.keys(content)).toEqual([
+            "categoryStudent",
+            "richShared",
+            "placeholder",
+        ]);
+    });
+});

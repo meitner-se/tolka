@@ -239,6 +239,68 @@ There is also `formatMessage` for a string that did not come from a dictionary:
 tolka.formatMessage("{n, plural, =1 {1 file} other {# files}}", "en", { n: 3 });
 ```
 
+## Sharing copy between dictionaries
+
+A component that calls a helper owning copy used to have to resolve the
+helper's dictionary too and hand the content straight back, for keys it never
+reads itself. `extends` removes that: the dictionary names what it also
+resolves, and the component resolves one thing.
+
+```ts
+// userCategories.dictionary.ts
+export const userCategoryLabels = tolka.createDictionary({
+    content: {
+        categoryStudent: { sv: "Elev", en: "Student" },
+        categoryEmployee: { sv: "Personal", en: "Employee" },
+    },
+});
+```
+
+```ts
+// useUserDropdown.dictionary.ts
+export const useUserDropdownDictionary = tolka.createDictionary({
+    extends: [userCategoryLabels],
+    content: {
+        placeholder: { sv: "Välj användare", en: "Pick a user" },
+    },
+});
+```
+
+```tsx
+const { content } = useDictionary(useUserDropdownDictionary);
+
+content.placeholder; // its own
+content.categoryStudent; // the one it extends
+```
+
+`extends` composes: a dictionary that extends one which itself extends another
+resolves all three. The chain is bounded at four hops, because anything longer
+is the namespace tree colocated dictionaries exist to replace.
+
+**Two dictionaries in one resolution may not define the same key.** It is a
+compile error naming the key and both sides — `content`, or the position in
+`extends` — because a silent last-wins would publish the wrong copy with
+nothing to catch it. A dictionary's plugin tags come along too, so a config
+that does not register them still refuses to resolve it, however many hops down
+the copy that needs them lives.
+
+Anything the compiler cannot read end to end is refused rather than resolved
+anyway, because every one of those checks is derived from the chain — a hop it
+cannot see does not fail a check, it quietly drops one. So `extends` wants an
+array literal at the call (a hoisted array hides which dictionaries are in it),
+a chain past four hops is a compile error rather than a silent truncation, and
+a dictionary built for a different locale set cannot be extended in, even one
+hop below an empty wrapper.
+
+Extending copies nothing. `content` holds a dictionary's own keys and only
+those, so `runConsistencyChecks`, your coverage ratios and any audit count each
+key once, under the dictionary that defines it. Extending a dictionary never
+moves another dictionary's numbers.
+
+Keep the extended units small. Extending a fifty-key helper drags every one of
+its keys into the consumer's content type, its autocomplete and its coverage
+ratio; extending a six-key unit does not.
+
 ## Plugins
 
 Locale is the only axis tolka knows about. Anything else is a plugin, so the
@@ -372,8 +434,9 @@ that, and the consistency checker, a future editor and any export all depend on
 it — they read content, they do not run it.
 
 The rule's main job is the spread. Reaching for `...common.content` to share
-copy is the first instinct; the answer is two dictionaries side by side, which
-with direct imports is just another import.
+copy is the first instinct; the answer is `extends`, which is a sibling of
+`content` rather than something inside it — the rule reads the `content` object
+and nothing else, so the identifiers in `extends` stay identifiers.
 
 ## Things that catch people out
 

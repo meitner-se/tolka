@@ -1,6 +1,6 @@
 import { IntlMessageFormat } from "intl-messageformat";
 
-import type { Leaf } from "./types.js";
+import type { DictionaryMeta, Leaf } from "./types.js";
 
 /**
  * A rule sees every variant of one key at once, not a single message. The
@@ -25,7 +25,8 @@ export type Finding = {
         | "tag-drift"
         | "self-closing"
         | "unparseable"
-        | "unknown-locale";
+        | "unknown-locale"
+        | "extends-collision";
     detail: string;
 };
 
@@ -141,6 +142,96 @@ export function flattenContent(
     }
 
     return flat;
+}
+
+/**
+ * The least a walk needs of a dictionary, so a plain object still qualifies.
+ *
+ * `content` is widened for iteration: an optional locale makes an entry an
+ * intersection of mapped types, which cannot be indexed by the full locale
+ * union while those are still generic.
+ */
+export type DictionaryNode = {
+    content: Record<string, unknown>;
+    extends?: readonly unknown[] | undefined;
+    meta?: DictionaryMeta | undefined;
+};
+
+/** One dictionary a resolution draws copy from, labelled by where it came in. */
+export type ChainMember = { label: string; dictionary: DictionaryNode };
+
+function isDictionaryNode(value: unknown): value is DictionaryNode {
+    return isNode(value) && isNode(value["content"]);
+}
+
+/**
+ * Every dictionary a resolution draws copy from: the extended ones first and
+ * depth-first, the dictionary itself last, each appearing once.
+ *
+ * The label is the extending dictionary's own `extends` index, carried down
+ * through transitive hops, so a finding names the line its author wrote rather
+ * than a position in this walk.
+ *
+ * Order is only a tie-break for a collision the compiler already refuses. It
+ * decides nothing for a dictionary that compiles, and the `seen` set is there
+ * for the same reason: a cycle cannot be written with `const` bindings, and
+ * the types refuse a chain they cannot read end to end, but a circular import
+ * can still hand one over half-built.
+ */
+export function extendsChain(dictionary: unknown): ChainMember[] {
+    const chain: ChainMember[] = [];
+    const seen = new Set<unknown>();
+
+    function walk(value: unknown, label: string): void {
+        if (!isDictionaryNode(value) || seen.has(value)) {
+            return;
+        }
+        seen.add(value);
+        for (const [index, extended] of (value.extends ?? []).entries()) {
+            walk(extended, label === "" ? `extends[${index}]` : label);
+        }
+        chain.push({
+            label: label === "" ? "content" : label,
+            dictionary: value,
+        });
+    }
+
+    walk(dictionary, "");
+    return chain;
+}
+
+/**
+ * Two of a resolution's dictionaries defining the same top-level key.
+ *
+ * The compiler refuses this at `createDictionary`, so this is the net under a
+ * JavaScript caller -- the one case left where a collision would otherwise go
+ * unproven and silently last-wins.
+ *
+ * Top-level keys only, which is exactly what a resolution merges: two
+ * dictionaries that both define the group `errors` would lose one side's
+ * branches wholesale, not blend them.
+ */
+export function checkExtends(dictionary: unknown, source?: string): Finding[] {
+    const findings: Finding[] = [];
+    const owner = new Map<string, string>();
+
+    for (const { label, dictionary: member } of extendsChain(dictionary)) {
+        for (const key of Object.keys(member.content)) {
+            const previous = owner.get(key);
+            if (previous === undefined) {
+                owner.set(key, label);
+                continue;
+            }
+            findings.push({
+                source,
+                key,
+                kind: "extends-collision",
+                detail: `defined by both ${previous} and ${label}`,
+            });
+        }
+    }
+
+    return findings;
 }
 
 /** Every renderable form of every key, which is what rules are given. */

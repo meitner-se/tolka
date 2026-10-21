@@ -217,3 +217,73 @@ describe("how a module may expose its dictionaries", () => {
         expect(report.findings).toEqual([]);
     });
 });
+
+describe("extends and coverage attribution", () => {
+    // A key counts once, for the dictionary that defines it. If `extends`
+    // contributed to the extending dictionary's coverage too, every app's
+    // numeric floor would shift under a refactor that changed no copy.
+    const shared = {
+        content: {
+            categoryStudent: { sv: "Elev", en: "Student", nb: "Elev" },
+            categoryStaff: { sv: "Personal", en: "Staff", nb: "Personale" },
+        },
+    };
+
+    const extending = {
+        content: { placeholder: { sv: "Välj", en: "Pick" } },
+        extends: [shared],
+    };
+
+    it("counts an extended key once, under the dictionary that defines it", () => {
+        const report = runConsistencyChecks(config, {
+            "./shared.dictionary.ts": shared,
+            "./extending.dictionary.ts": extending,
+        });
+
+        expect(report.coverage["sv"]).toEqual({
+            present: 3,
+            total: 3,
+            ratio: 1,
+        });
+        // Two of the three keys have `nb`, and both are the shared ones.
+        expect(report.coverage["nb"]).toEqual({
+            present: 2,
+            total: 3,
+            ratio: 2 / 3,
+        });
+    });
+
+    it("gives the same numbers whether or not the extending dictionary is globbed", () => {
+        const withExtender = runConsistencyChecks(config, {
+            "./shared.dictionary.ts": shared,
+            "./extending.dictionary.ts": extending,
+        });
+        const asSiblings = runConsistencyChecks(config, {
+            "./shared.dictionary.ts": shared,
+            "./extending.dictionary.ts": { content: extending.content },
+        });
+
+        expect(withExtender.coverage).toEqual(asSiblings.coverage);
+    });
+
+    it("reports a finding against the dictionary that defines the key", () => {
+        const drifting = {
+            content: {
+                greet: { sv: "Hej {name}", en: "Hello", nb: "Hei {name}" },
+            },
+        };
+        const report = runConsistencyChecks(config, {
+            "./shared.dictionary.ts": drifting,
+            "./extending.dictionary.ts": {
+                content: { own: { sv: "Egen", en: "Own", nb: "Egen" } },
+                extends: [drifting],
+            },
+        });
+
+        expect(report.findings).toHaveLength(1);
+        expect(report.findings[0]).toMatchObject({
+            source: "./shared.dictionary.ts",
+            key: "greet",
+        });
+    });
+});
