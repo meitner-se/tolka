@@ -264,10 +264,151 @@ export type DictionaryMeta = {
     source?: string | undefined;
 };
 
-export interface Dictionary<C> {
+/**
+ * Structural constraint for whatever sits in an `extends` array.
+ *
+ * Loose about the nested `extends` on purpose: those elements were constrained
+ * when each of them was built, and restating the constraint here would make
+ * the type recursive for no added proof.
+ */
+export type AnyDictionary = {
+    content: object;
+    extends?: readonly unknown[] | undefined;
+    meta?: DictionaryMeta | undefined;
+};
+
+export interface Dictionary<C, E extends readonly AnyDictionary[] = []> {
     content: C;
+    /**
+     * Dictionaries this one also resolves, so one `useDictionary` hands back
+     * every key a component reads.
+     *
+     * The copy stays theirs: `content` holds this dictionary's own keys and
+     * nothing more, which is what keeps coverage, the consistency checks and
+     * the audit counting each key once, under the dictionary that defines it.
+     */
+    extends?: E | undefined;
     meta?: DictionaryMeta | undefined;
 }
+
+// ---------------------------------------------------------------- extends
+
+/**
+ * Counts an `extends` chain down to zero, for the reason `Down` counts content
+ * depth: unbounded conditional recursion is what TypeScript 5.6 and 5.7 reject
+ * with TS2589. Three hops is far past what the model is for -- `extends`
+ * composes small units, and a chain longer than that is the namespace tree
+ * colocated dictionaries replace. Past the bound a deeper key is simply absent
+ * from the type, so reading one fails to compile rather than resolving to
+ * something unproven; the runtime walk is not bounded at all.
+ */
+type ChainDown = [never, 0, 1, 2];
+
+/**
+ * Everything resolving a dictionary yields: its own content intersected with
+ * each extended dictionary's, transitively.
+ *
+ * An intersection rather than a merge: the keys are proven disjoint at
+ * `createDictionary`, so there is nothing for a merge to decide, and `Resolved`
+ * maps over it to one flat object either way.
+ */
+export type Extended<C, E, N extends 0 | 1 | 2 | 3 = 3> = C &
+    ExtendedList<E, N>;
+
+type ExtendedList<E, N extends 0 | 1 | 2 | 3> = E extends readonly [
+    infer Head,
+    ...infer Rest,
+]
+    ? ExtendedOne<Head, N> & ExtendedList<Rest, N>
+    : unknown;
+
+type ExtendedOne<D, N extends 0 | 1 | 2 | 3> =
+    D extends Dictionary<infer C, infer E>
+        ? N extends 0
+            ? C
+            : Extended<C, E, ChainDown[N]>
+        : unknown;
+
+/** The top-level keys a dictionary resolves, its extends' included. */
+type KeysOf<D> = Extract<keyof ExtendedOne<D, 3>, string>;
+
+/**
+ * Where a key already came from. A dictionary is an anonymous module object,
+ * so there is no name to report; its position in the call -- `content`, or
+ * `extends[1]` -- is what locates it, and the error points at the source line
+ * that spells both out.
+ */
+type OwnerOf<
+    Key extends string,
+    Own extends string,
+    Rest,
+    I extends readonly unknown[] = [],
+> = Key extends Own
+    ? "content"
+    : Rest extends readonly [infer Head, ...infer Tail]
+      ? Key extends KeysOf<Head>
+          ? `extends[${I["length"]}]`
+          : OwnerOf<Key, Own, Tail, [...I, unknown]>
+      : "an extended dictionary";
+
+type Describe<
+    Keys extends string,
+    Own extends string,
+    All,
+    At extends number,
+> = Keys extends string
+    ? `"${Keys}" is defined by both ${OwnerOf<Keys, Own, All>} and extends[${At}]`
+    : never;
+
+/**
+ * Every key two of a resolution's dictionaries both define.
+ *
+ * The owner lookup only ever runs on the failing branch, which a conditional
+ * leaves uninstantiated otherwise -- so a dictionary with no collision pays
+ * for the key-set union and nothing else.
+ */
+type Walk<
+    Own extends string,
+    All,
+    Rest,
+    Seen extends string,
+    I extends readonly unknown[],
+> = Rest extends readonly [infer Head, ...infer Tail]
+    ?
+          | ([Extract<KeysOf<Head>, Seen>] extends [never]
+                ? never
+                : Describe<Extract<KeysOf<Head>, Seen>, Own, All, I["length"]>)
+          | Walk<Own, All, Tail, Seen | KeysOf<Head>, [...I, unknown]>
+    : never;
+
+export type ExtendsCollision<Detail extends string> = {
+    __tolkaError: "extends: two dictionaries define the same key, so which copy a component gets would be a coin toss. Rename the key, or drop one of them.";
+    collision: Detail;
+};
+
+type GuardFrom<Detail extends string> = [Detail] extends [never]
+    ? unknown
+    : ExtendsCollision<Detail>;
+
+/**
+ * `unknown` when nothing collides, so the definition is accepted unchanged;
+ * otherwise a shape no object literal can satisfy, which is what turns a
+ * collision into a compile error rather than a silent last-wins.
+ */
+export type ExtendsGuard<C, E> = GuardFrom<
+    Walk<Extract<keyof C, string>, E, E, Extract<keyof C, string>, []>
+>;
+
+/**
+ * What `extends` accepts: a dictionary this config could already resolve on
+ * its own. Constraining the content here rather than taking `AnyDictionary` is
+ * what keeps a dictionary built for another locale set from being absorbed
+ * into one that promises those locales.
+ */
+export type Extendable<L extends string, R extends L = L> = Dictionary<
+    Content<L, R>,
+    readonly AnyDictionary[]
+>;
 
 /**
  * Probing with the default locale, rather than key names, is what keeps a

@@ -796,3 +796,192 @@ describe("groups", () => {
         expect(String(onError.mock.calls[0]?.[0])).toContain("group.branch");
     });
 });
+
+describe("extends", () => {
+    const tolka = setup(() => {});
+
+    const categories = tolka.createDictionary({
+        content: {
+            categoryStudent: { sv: "Elev", en: "Student" },
+            categoryStaff: { sv: "Personal", en: "Staff" },
+        },
+        meta: { source: "shared/categories.dictionary.ts" },
+    });
+
+    const counts = tolka.createDictionary({
+        content: {
+            userCount: {
+                sv: "{count, plural, one {# användare} other {# användare}}",
+                en: "{count, plural, one {# user} other {# users}}",
+            },
+            toned: {
+                sv: tone({ default: "Hej", formal: "God dag" }),
+                en: "Hello",
+            },
+            grouped: {
+                Alpha: { sv: "Alfa", en: "Alpha" },
+            },
+        },
+    });
+
+    const dropdown = tolka.createDictionary({
+        extends: [categories, counts],
+        content: { placeholder: { sv: "Välj", en: "Pick" } },
+    });
+
+    it("hands back its own keys and the extended ones from one resolution", () => {
+        const { content } = tolka.resolveDictionary(dropdown, {
+            locale: "sv",
+            state: { tone: "formal" },
+        });
+        expect(content.placeholder).toBe("Välj");
+        expect(content.categoryStudent).toBe("Elev");
+        expect(call(content.userCount, { count: 2 })).toBe("2 användare");
+    });
+
+    it("leaves the extended copy where it was defined", () => {
+        // The whole of decision 2 rests on this: coverage, the consistency
+        // checks and the audit all walk `content`, so an extended key must
+        // never appear in the extending dictionary's own.
+        expect(Object.keys(dropdown.content)).toEqual(["placeholder"]);
+    });
+
+    it("resolves a plugin tag in extended content through the resolving config", () => {
+        const { content } = tolka.resolveDictionary(dropdown, {
+            locale: "sv",
+            state: { tone: "formal" },
+        });
+        expect(content.toned).toBe("God dag");
+    });
+
+    it("keeps a group in extended content a group", () => {
+        const { content } = tolka.resolveDictionary(dropdown, {
+            locale: "en",
+            state: { tone: "casual" },
+        });
+        expect(content.grouped.Alpha).toBe("Alpha");
+    });
+
+    it("composes transitively", () => {
+        const base = tolka.createDictionary({
+            content: { fromBase: { sv: "Bas", en: "Base" } },
+        });
+        const middle = tolka.createDictionary({
+            extends: [base],
+            content: { fromMiddle: { sv: "Mellan", en: "Middle" } },
+        });
+        const leaf = tolka.createDictionary({
+            extends: [middle],
+            content: { fromLeaf: { sv: "Löv", en: "Leaf" } },
+        });
+        const { content } = tolka.resolveDictionary(leaf, {
+            locale: "sv",
+            state: { tone: "casual" },
+        });
+        expect(content.fromBase).toBe("Bas");
+        expect(content.fromMiddle).toBe("Mellan");
+        expect(content.fromLeaf).toBe("Löv");
+    });
+
+    it("tells postResolve the source of the dictionary that defines the key", () => {
+        const seen: ResolveInfo[] = [];
+        const withSource = createTolka({
+            locales: ["sv", "en"] as const,
+            defaultLocale: "sv",
+            plugins: [] as const,
+            postResolve: (message, info) => {
+                seen.push(info);
+                return message;
+            },
+        });
+        const shared = withSource.createDictionary({
+            content: { shared: { sv: "Delad", en: "Shared" } },
+            meta: { source: "shared/unit.dictionary.ts" },
+        });
+        const own = withSource.createDictionary({
+            extends: [shared],
+            content: { own: { sv: "Egen", en: "Own" } },
+            meta: { source: "feature/own.dictionary.ts" },
+        });
+        withSource.resolveDictionary(own, { locale: "sv", state: {} });
+        expect(seen).toEqual([
+            {
+                key: "shared",
+                locale: "sv",
+                source: "shared/unit.dictionary.ts",
+            },
+            { key: "own", locale: "sv", source: "feature/own.dictionary.ts" },
+        ]);
+    });
+
+    it("reports an absent key in extended content by its own path", () => {
+        const onError = vi.fn();
+        const reporting = setup(onError);
+        const shared = reporting.createDictionary({
+            content: { group: { branch: {} } },
+        });
+        const own = reporting.createDictionary({
+            extends: [shared],
+            content: { own: { sv: "Egen", en: "Own" } },
+        });
+
+        reporting.resolveDictionary(own, {
+            locale: "sv",
+            state: { tone: "formal" },
+        });
+
+        // The path is read off the defining dictionary, so a finding names
+        // the key an author would search for rather than where it surfaced.
+        expect(String(onError.mock.calls[0]?.[0])).toContain("group.branch");
+    });
+
+    it("falls back one hop for an optional locale in extended content", () => {
+        const partial = createTolka({
+            locales: ["sv", defineLocale("en", { optional: true })] as const,
+            defaultLocale: "sv",
+            plugins: [] as const,
+        });
+        const shared = partial.createDictionary({
+            content: { shared: { sv: "Delad" } },
+        });
+        const own = partial.createDictionary({
+            extends: [shared],
+            content: { own: { sv: "Egen" } },
+        });
+
+        const { content } = partial.resolveDictionary(own, {
+            locale: "en",
+            state: {},
+        });
+
+        expect(content.shared).toBe("Delad");
+    });
+
+    it("refuses a collision the compiler could not see", () => {
+        // A JavaScript caller, or a chain deeper than the type's bound. Last
+        // wins would publish the wrong copy with nothing to catch it.
+        const shared = tolka.createDictionary({
+            content: { title: { sv: "Delad", en: "Shared" } },
+        });
+        const colliding = {
+            extends: [shared],
+            content: { title: { sv: "Egen", en: "Own" } },
+        };
+        expect(() => tolka.createDictionary(colliding as never)).toThrow(
+            /title \[extends-collision\] defined by both extends\[0\] and content/
+        );
+    });
+
+    it("survives a dictionary that extends itself", () => {
+        const circular: {
+            content: Record<string, Record<string, string>>;
+            extends: unknown[];
+        } = { content: { own: { sv: "Egen", en: "Own" } }, extends: [] };
+        circular.extends.push(circular);
+        const { content } = tolka.resolveDictionary(circular as never, {
+            locale: "sv",
+            state: { tone: "casual" },
+        });
+        expect(content).toEqual({ own: "Egen" });
+    });
+});

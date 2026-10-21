@@ -71,6 +71,23 @@ assert.equal(
     "[example.dictionary.ts:plain]Filer"
 );
 
+// `extends` survives the build: the chain walk lives in the core, and the
+// extended copy has to arrive without being copied into the extender.
+const shared = tolka.createDictionary({
+    content: { shared: { sv: "Delad", en: "Shared" } },
+});
+const extending = tolka.createDictionary({
+    extends: [shared],
+    content: { own: { sv: "Egen", en: "Own" } },
+});
+const extended = tolka.resolveDictionary(extending, {
+    locale: "sv",
+    state: { tone: "formal" },
+}).content;
+assert.equal(extended.shared, "Delad");
+assert.equal(extended.own, "Egen");
+assert.deepEqual(Object.keys(extending.content), ["own"]);
+
 // The react subpath resolves and emits.
 const { createReactBindings } = await import("../dist/react.js");
 const bindings = createReactBindings(tolka);

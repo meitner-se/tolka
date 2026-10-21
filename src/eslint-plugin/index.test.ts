@@ -136,3 +136,38 @@ describe("content-depth", () => {
         });
     });
 });
+
+describe("extends is a sibling of content, so neither rule sees it", () => {
+    it("leaves the extends array alone", () => {
+        // `extends` is the sanctioned form of what `static-content` blocks
+        // authors doing by hand. Both rules read the `content` object and
+        // nothing else, which is what lets the identifiers in `extends` be
+        // identifiers.
+        ruleTester.run("static-content", rules["static-content"], {
+            valid: [
+                {
+                    code: `tolka.createDictionary({ extends: [userCategoryLabels], content: { a: { sv: "Hej", en: "Hi" } } });`,
+                },
+                {
+                    code: `tolka.createDictionary({ extends: [...shared], content: { a: { sv: "Hej" } } });`,
+                },
+            ],
+            invalid: [
+                {
+                    // The content object is still guarded, extends or not.
+                    code: `tolka.createDictionary({ extends: [labels], content: { ...common.content, a: { sv: "Hej" } } });`,
+                    errors: [{ messageId: "spread" }],
+                },
+            ],
+        });
+
+        ruleTester.run("content-depth", rules["content-depth"], {
+            valid: [
+                {
+                    code: `tolka.createDictionary({ extends: [a, b], content: { g: { h: { sv: "Hej" } } } });`,
+                },
+            ],
+            invalid: [],
+        });
+    });
+});

@@ -11,17 +11,30 @@ export type {
 
 export {
     checkDictionary,
+    checkExtends,
     formatFindings,
     localeCoverage,
     variantsOf,
 } from "./check.js";
-export type { Finding, LocaleCoverage, Rule, Variant } from "./check.js";
+export type {
+    ChainMember,
+    DictionaryNode,
+    Finding,
+    LocaleCoverage,
+    Rule,
+    Variant,
+} from "./check.js";
 
 export type {
+    AnyDictionary,
     AnyPlugin,
     Content,
     Dictionary,
     DictionaryMeta,
+    Extendable,
+    Extended,
+    ExtendsCollision,
+    ExtendsGuard,
     HasTags,
     Leaf,
     LocaleDef,

@@ -11,9 +11,11 @@ import {
 
 import type { Tolka } from "./runtime.js";
 import type {
+    AnyDictionary,
     AnyPlugin,
     Content,
     Dictionary,
+    Extended,
     Resolved,
     StateFromPlugins,
     TagsUsed,
@@ -167,10 +169,15 @@ export function createReactBindings<
         return createElement(Context.Provider, { value: axes }, children);
     }
 
-    function useDictionary<C extends Content<L, R>>(
-        dictionary: Dictionary<C> &
-            ([TagsUsed<C>] extends [P[number]["tag"]] ? unknown : never)
-    ): { content: Resolved<C, D> } {
+    function useDictionary<
+        C extends Content<L, R>,
+        E extends readonly AnyDictionary[] = [],
+    >(
+        dictionary: Dictionary<C, E> &
+            ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
+                ? unknown
+                : never)
+    ): { content: Resolved<Extended<C, E>, D> } {
         const axes = useContext(Context);
         if (!axes) {
             throw new Error(
@@ -187,7 +194,7 @@ export function createReactBindings<
 
         const cached = byAxes.get(key);
         if (cached) {
-            return asResolved<C>(cached);
+            return asResolved<Extended<C, E>>(cached);
         }
 
         // Resolution is pure apart from `onError`, and the cache means a
@@ -201,7 +208,7 @@ export function createReactBindings<
             content: wrapFormatters(resolved.content),
         };
         byAxes.set(key, result);
-        return asResolved<C>(result);
+        return asResolved<Extended<C, E>>(result);
     }
 
     return { DictionaryProvider, useDictionary };

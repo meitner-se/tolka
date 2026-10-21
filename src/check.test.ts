@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { checkDictionary, formatFindings, localeCoverage } from "./check.js";
+import {
+    checkDictionary,
+    checkExtends,
+    extendsChain,
+    formatFindings,
+    localeCoverage,
+} from "./check.js";
 
 const kinds = (findings: { kind: string }[]) =>
     findings.map((finding) => finding.kind).sort();
@@ -274,5 +280,130 @@ describe("groups", () => {
         // Three keys carry copy; the group itself is not one of them.
         expect(coverage["sv"]?.total).toBe(3);
         expect(coverage["en"]?.present).toBe(2);
+    });
+});
+
+describe("extendsChain", () => {
+    const base = { content: { fromBase: { sv: "Bas" } } };
+    const middle = {
+        content: { fromMiddle: { sv: "Mellan" } },
+        extends: [base],
+    };
+    const leaf = { content: { fromLeaf: { sv: "Löv" } }, extends: [middle] };
+
+    it("walks depth-first and puts the dictionary itself last", () => {
+        expect(extendsChain(leaf).map((member) => member.dictionary)).toEqual([
+            base,
+            middle,
+            leaf,
+        ]);
+    });
+
+    it("labels every hop by the extends entry it came in through", () => {
+        expect(extendsChain(leaf).map((member) => member.label)).toEqual([
+            "extends[0]",
+            "extends[0]",
+            "content",
+        ]);
+    });
+
+    it("numbers the extends entries an author wrote", () => {
+        const both = { content: {}, extends: [base, middle] };
+        expect(extendsChain(both).map((member) => member.label)).toEqual([
+            "extends[0]",
+            "extends[1]",
+            "content",
+        ]);
+    });
+
+    it("visits each dictionary once, however many paths reach it", () => {
+        const diamond = { content: {}, extends: [base, middle] };
+        expect(extendsChain(diamond)).toHaveLength(3);
+    });
+
+    it("terminates on a cycle", () => {
+        const circular: { content: object; extends: unknown[] } = {
+            content: { own: { sv: "Egen" } },
+            extends: [],
+        };
+        circular.extends.push(circular);
+        expect(extendsChain(circular)).toHaveLength(1);
+    });
+
+    it("ignores an entry that is not a dictionary", () => {
+        expect(extendsChain({ content: {}, extends: [null, 7, "x"] })).toEqual([
+            {
+                label: "content",
+                dictionary: { content: {}, extends: [null, 7, "x"] },
+            },
+        ]);
+    });
+
+    it("is empty for something that is not a dictionary at all", () => {
+        expect(extendsChain(undefined)).toEqual([]);
+    });
+});
+
+describe("checkExtends", () => {
+    const shared = { content: { title: { sv: "Delad" } } };
+
+    it("is silent when the key sets are disjoint", () => {
+        expect(
+            checkExtends({
+                content: { own: { sv: "Egen" } },
+                extends: [shared],
+            })
+        ).toEqual([]);
+    });
+
+    it("names both sides when the extending dictionary redefines a key", () => {
+        expect(
+            checkExtends(
+                { content: { title: { sv: "Egen" } }, extends: [shared] },
+                "feature/own.dictionary.ts"
+            )
+        ).toEqual([
+            {
+                source: "feature/own.dictionary.ts",
+                key: "title",
+                kind: "extends-collision",
+                detail: "defined by both extends[0] and content",
+            },
+        ]);
+    });
+
+    it("names both sides when two extended dictionaries collide", () => {
+        const other = { content: { title: { sv: "Annan" } } };
+        expect(
+            checkExtends({ content: {}, extends: [shared, other] })
+        ).toMatchObject([
+            {
+                key: "title",
+                detail: "defined by both extends[0] and extends[1]",
+            },
+        ]);
+    });
+
+    it("catches a collision a transitive hop brought in", () => {
+        const middle = {
+            content: { middle: { sv: "Mellan" } },
+            extends: [shared],
+        };
+        expect(
+            checkExtends({
+                content: { title: { sv: "Egen" } },
+                extends: [middle],
+            })
+        ).toMatchObject([{ key: "title" }]);
+    });
+
+    it("compares top-level keys, because that is what a resolution merges", () => {
+        // Two dictionaries defining the same group would lose one side's
+        // branches wholesale, not blend them.
+        const group = { content: { errors: { NotFound: { sv: "Borta" } } } };
+        const otherGroup = { content: { errors: { Denied: { sv: "Nekad" } } } };
+        expect(
+            checkExtends({ content: {}, extends: [group, otherGroup] })
+        ).toMatchObject([{ key: "errors" }]);
     });
 });
