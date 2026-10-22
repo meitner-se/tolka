@@ -119,12 +119,55 @@ function stateKey(state: Record<string, unknown>): string {
     );
 }
 
+/**
+ * What `createReactBindings` returns, named rather than inferred.
+ *
+ * A consumer holds these in a module of its own — one instance, one context —
+ * and packages that emit declarations re-export them. Left anonymous, the
+ * declaration emitter has no name to point at and writes `useDictionary`'s
+ * type out in full, which walks `Extended` and `ChainGuard` into their own
+ * recursion and fails with TS5088 in the consumer, not here. Naming it is what
+ * lets `export const { useDictionary } = createReactBindings(tolka)` be
+ * inferred, with no annotation on the consumer's side.
+ */
+export type DictionaryProviderOf<
+    L extends string,
+    P extends readonly AnyPlugin[],
+> = (props: {
+    locale: L;
+    state: StateFromPlugins<P>;
+    children: ReactNode;
+}) => ReactNode;
+
+export type UseDictionaryOf<
+    L extends string,
+    R extends L,
+    D extends R,
+    P extends readonly AnyPlugin[],
+> = <C extends Content<L, R>, E extends readonly AnyDictionary[] = []>(
+    dictionary: Dictionary<C, E> &
+        ChainGuard<L, R, E> &
+        ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
+            ? unknown
+            : never)
+) => { content: Resolved<Extended<C, E>, D> };
+
+export interface ReactBindings<
+    L extends string,
+    R extends L,
+    D extends R,
+    P extends readonly AnyPlugin[],
+> {
+    DictionaryProvider: DictionaryProviderOf<L, P>;
+    useDictionary: UseDictionaryOf<L, R, D, P>;
+}
+
 export function createReactBindings<
     L extends string,
     R extends L,
     D extends R,
     P extends readonly AnyPlugin[],
->(tolka: Tolka<L, R, D, P>) {
+>(tolka: Tolka<L, R, D, P>): ReactBindings<L, R, D, P> {
     type State = StateFromPlugins<P>;
     type Axes = { locale: L; state: State };
 
