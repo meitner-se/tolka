@@ -1,0 +1,155 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "options": {
+        "typeAware": true
+    },
+    "categories": {
+        "correctness": "error",
+        "suspicious": "error",
+        "perf": "error"
+    },
+    "plugins": ["import", "typescript", "unicorn", "react"],
+    "rules": {
+        "curly": "error",
+        "array-callback-return": "error",
+        "block-scoped-var": "error",
+        "default-param-last": "error",
+        "eqeqeq": "error",
+        "func-style": ["error", "declaration"],
+        "max-params": [
+            "error",
+            {
+                "max": 4
+            }
+        ],
+        "max-lines": [
+            "error",
+            {
+                "max": 500
+            }
+        ],
+        "no-array-constructor": "error",
+        "no-console": [
+            "error",
+            {
+                "allow": ["warn", "error"]
+            }
+        ],
+        "no-else-return": "error",
+        "no-eval": "error",
+        "no-implicit-coercion": "error",
+        "no-lone-blocks": "error",
+        "no-new-func": "error",
+        "no-object-constructor": "error",
+        "no-self-compare": "error",
+        "no-template-curly-in-string": "error",
+        "no-throw-literal": "error",
+        "no-unneeded-ternary": "error",
+        "no-unused-vars": "error",
+        "no-useless-concat": "error",
+        "no-useless-computed-key": "error",
+        "no-useless-return": "error",
+        "no-var": "error",
+        "object-shorthand": ["error", "always"],
+        "prefer-arrow-callback": "error",
+        "prefer-const": "error",
+        "prefer-template": "error",
+        "id-length": [
+            "error",
+            {
+                "min": 3,
+                "properties": "never",
+                "exceptions": [
+                    "to",
+                    "t",
+                    "i",
+                    "j",
+                    "_",
+                    "id",
+                    "x",
+                    "y",
+                    "on",
+                    "as"
+                ],
+                "checkGeneric": false
+            }
+        ],
+        "import/export": "error",
+        "import/named": "error",
+        "import/no-duplicates": "error",
+        "import/no-empty-named-blocks": "error",
+        "typescript/ban-ts-comment": [
+            "error",
+            {
+                "ts-nocheck": false,
+                "ts-expect-error": "allow-with-description"
+            }
+        ],
+        "typescript/array-type": "error",
+        "typescript/consistent-type-assertions": "error",
+        "typescript/consistent-type-imports": "error",
+        "typescript/no-confusing-void-expression": "error",
+        "typescript/no-explicit-any": "error",
+        "typescript/no-inferrable-types": "error",
+        "typescript/no-invalid-void-type": "error",
+        "typescript/no-non-null-assertion": "error",
+        "typescript/no-unnecessary-condition": "error",
+        "typescript/no-unnecessary-type-assertion": "error",
+        "typescript/no-unsafe-function-type": "error",
+        "typescript/no-unsafe-type-assertion": "warn",
+        "typescript/no-unused-expressions": "error",
+        "typescript/only-throw-error": "error",
+        "typescript/prefer-find": "error",
+        "typescript/prefer-for-of": "error",
+        "typescript/prefer-function-type": "error",
+        "typescript/require-await": "error",
+        "typescript/restrict-plus-operands": [
+            "error",
+            {
+                "allowNumberAndString": false
+            }
+        ],
+        "typescript/restrict-template-expressions": [
+            "error",
+            {
+                "allowNullish": false
+            }
+        ],
+        "typescript/unified-signatures": "error",
+        "unicorn/no-array-for-each": "error",
+        "unicorn/prefer-node-protocol": "error",
+        "no-underscore-dangle": [
+            "error",
+            {
+                "allow": ["__tag", "__tolkaError"]
+            }
+        ],
+        "react/react-in-jsx-scope": "off"
+    },
+    "overrides": [
+        {
+            "files": ["src/vendor/**"],
+            "rules": {
+                "typescript/no-explicit-any": "off",
+                "typescript/array-type": "off",
+                "unicorn/no-array-for-each": "off"
+            }
+        },
+        {
+            "files": ["**/*.test.ts", "**/*.test.tsx", "typetests/**"],
+            "rules": {
+                "typescript/no-explicit-any": "off",
+                "typescript/no-unsafe-type-assertion": "off",
+                "max-lines": "off",
+                "func-style": "off"
+            }
+        },
+        {
+            "files": ["scripts/**"],
+            "rules": {
+                "no-console": "off",
+                "typescript/no-unnecessary-condition": "off"
+            }
+        }
+    ]
+}
