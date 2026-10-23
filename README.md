@@ -100,19 +100,19 @@ union is read dynamically while the compiler still proves every branch exists:
 ```ts
 export const dictionary = createDictionary({
     content: {
-        sectionType: {
-            Program: { sv: "Programgemensam", en: "Programme specific" },
-            Orientation: { sv: "Inriktningsgemensam", en: "Orientation" },
+        status: {
+            Draft: { sv: "Utkast", en: "Draft" },
+            Published: { sv: "Publicerad", en: "Published" },
         },
     },
 });
 
 const { content } = useDictionary(dictionary);
 
-content.sectionType[category]; // string
+content.status[state]; // string
 ```
 
-Add a third member to `category` without adding its branch and the index stops
+Add a third member to `status` without adding its branch and the index stops
 compiling. That is the whole point of the shape — an ICU `select` cannot do it,
 because `select` requires an `other` clause and `other` widens the argument to
 `string`.
@@ -247,11 +247,11 @@ reads itself. `extends` removes that: the dictionary names what it also
 resolves, and the component resolves one thing.
 
 ```ts
-// userCategories.dictionary.ts
-export const userCategoryLabels = tolka.createDictionary({
+// userRoles.dictionary.ts
+export const userRoleLabels = tolka.createDictionary({
     content: {
-        categoryStudent: { sv: "Elev", en: "Student" },
-        categoryEmployee: { sv: "Personal", en: "Employee" },
+        roleAdmin: { sv: "Administratör", en: "Admin" },
+        roleMember: { sv: "Medlem", en: "Member" },
     },
 });
 ```
@@ -259,7 +259,7 @@ export const userCategoryLabels = tolka.createDictionary({
 ```ts
 // useUserDropdown.dictionary.ts
 export const useUserDropdownDictionary = tolka.createDictionary({
-    extends: [userCategoryLabels],
+    extends: [userRoleLabels],
     content: {
         placeholder: { sv: "Välj användare", en: "Pick a user" },
     },
@@ -270,7 +270,7 @@ export const useUserDropdownDictionary = tolka.createDictionary({
 const { content } = useDictionary(useUserDropdownDictionary);
 
 content.placeholder; // its own
-content.categoryStudent; // the one it extends
+content.roleAdmin; // the one it extends
 ```
 
 `extends` composes: a dictionary that extends one which itself extends another
