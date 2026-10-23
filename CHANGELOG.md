@@ -1,5 +1,15 @@
 # @meitner/tolka
 
+## 0.3.0
+
+### Minor Changes
+
+- [#3](https://github.com/meitner-se/tolka/pull/3) [`fee05cf`](https://github.com/meitner-se/tolka/commit/fee05cf763c1c601abdc64f26355595bd39ab5a5) Thanks [@MattisAbrahamsson](https://github.com/MattisAbrahamsson)! - A custom rule passed to `runConsistencyChecks` now names its own findings. Rules
+  return just the key and the detail; the walk stamps the file, the kind `"rule"`
+  and the rule's name, and `formatFindings` prints that name in the label. Until
+  now the `Finding` kind union held only the library's structural kinds, so a rule
+  had to borrow one — a glossary violation reported itself as unparseable ICU.
+
 ## 0.2.1
 
 ### Patch Changes
