@@ -22,6 +22,7 @@ export type {
     Finding,
     LocaleCoverage,
     Rule,
+    RuleFinding,
     Variant,
 } from "./check.js";
 

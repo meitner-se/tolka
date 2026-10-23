@@ -411,6 +411,29 @@ test("content is consistent", () => {
 It reports placeholder drift, tag drift, unparseable ICU, undeclared locales and
 self-closing tags, and it tells you which file each one came from.
 
+### Rules of your own
+
+Those checks are structural: they hold for any language. A rule is how you add
+one that does not — house terminology, a typographic convention, a locale that
+must stay shorter than its source. A rule sees every locale and state of one key
+together, so it can compare a translation against the copy it came from:
+
+```ts
+const quotes: Rule = {
+    name: "quotes",
+    check: ({ key, variants }) =>
+        variants
+            .filter((v) => v.locale === "de" && v.message.includes('"'))
+            .map((v) => ({ key, detail: `${v.locale}: use „ and “` })),
+};
+
+const report = runConsistencyChecks(tolka, modules, { rules: [quotes] });
+```
+
+A rule returns only the key and what is wrong. The walk stamps the file and the
+rule's own name, so the report reads `./a.dictionary.ts:quote [quotes] de: …`
+and a structural finding can never be mistaken for one of yours.
+
 ## Keeping content readable without running it
 
 ```js
