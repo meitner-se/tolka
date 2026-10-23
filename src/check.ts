@@ -13,7 +13,16 @@ export type Rule = {
         key: string;
         source?: string | undefined;
         variants: Variant[];
-    }) => Finding[];
+    }) => RuleFinding[];
+};
+
+/**
+ * A rule names the key and says what is wrong; the walk stamps the rest, so a
+ * glossary violation can never masquerade as one of the structural kinds.
+ */
+export type RuleFinding = {
+    key: string;
+    detail: string;
 };
 
 export type Finding = {
@@ -26,7 +35,10 @@ export type Finding = {
         | "self-closing"
         | "unparseable"
         | "unknown-locale"
-        | "extends-collision";
+        | "extends-collision"
+        | "rule";
+    /** The rule that raised it. Set only when `kind` is `"rule"`. */
+    rule?: string | undefined;
     detail: string;
 };
 
@@ -371,7 +383,7 @@ export function formatFindings(findings: Finding[]): string {
     return findings
         .map(
             (finding) =>
-                `${finding.source ? `${finding.source}:` : ""}${finding.key} [${finding.kind}] ${finding.detail}`
+                `${finding.source ? `${finding.source}:` : ""}${finding.key} [${finding.rule ?? finding.kind}] ${finding.detail}`
         )
         .join("\n");
 }

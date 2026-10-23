@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Rule } from "./check.js";
 
+import { formatFindings } from "./check.js";
 import { runConsistencyChecks } from "./testing.js";
 
 const config = { locales: ["sv", "en", "nb"] as const, defaultLocale: "sv" };
@@ -107,16 +108,14 @@ describe("runConsistencyChecks", () => {
 describe("rules", () => {
     const typography: Rule = {
         name: "typography",
-        check: ({ key, source, variants }) =>
+        check: ({ key, variants }) =>
             variants
                 .filter(
                     (variant) =>
                         variant.locale === "de" && variant.message.includes('"')
                 )
                 .map((variant) => ({
-                    source,
                     key,
-                    kind: "unparseable" as const,
                     detail: `${variant.locale}: use „ and “ rather than "`,
                 })),
     };
@@ -167,6 +166,10 @@ describe("rules", () => {
         );
         expect(report.findings).toHaveLength(1);
         expect(report.findings[0]?.detail).toMatch(/use „ and “/);
+        expect(report.findings[0]?.kind).toBe("rule");
+        expect(formatFindings(report.findings)).toContain(
+            "./a.content.ts:quote [typography]"
+        );
     });
 });
 

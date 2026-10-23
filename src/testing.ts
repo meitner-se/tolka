@@ -92,7 +92,14 @@ export function runConsistencyChecks(
 
             for (const entry of variantsOf(dictionary.content)) {
                 for (const rule of rules) {
-                    findings.push(...rule.check({ ...entry, source }));
+                    for (const finding of rule.check({ ...entry, source })) {
+                        findings.push({
+                            ...finding,
+                            kind: "rule",
+                            rule: rule.name,
+                            source,
+                        });
+                    }
                 }
             }
 
