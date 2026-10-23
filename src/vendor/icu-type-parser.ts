@@ -1,10 +1,33 @@
 /**
- * Vendored from `@schummar/icu-type-parser` 1.21.5 (MIT, Matthias Schumann).
+ * Vendored from `@schummar/icu-type-parser` 1.21.5, by Marco Schumacher.
+ * Its licence is reproduced at the end of this header, as MIT requires.
  *
  * Pure conditional and template-literal types, zero runtime. Vendored rather
  * than depended on: as a published library its quirks across TypeScript
  * versions become ours to answer for, and the version matrix in CI is what
  * makes the supported range a policy rather than a hope.
+ *
+ * MIT License
+ *
+ * Copyright (c) 2021 Marco Schumacher
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 type Flatten<T> = T extends object

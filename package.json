@@ -2,10 +2,25 @@
     "name": "@meitner/tolka",
     "version": "0.2.1",
     "description": "Typesafe ICU message formatting with direct imports, no registry and no build step.",
+    "keywords": [
+        "i18n",
+        "icu",
+        "intl",
+        "typescript",
+        "type-safe",
+        "localization",
+        "localisation",
+        "translation",
+        "react"
+    ],
     "license": "MIT",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/meitner-se/tolka.git"
+    },
+    "homepage": "https://github.com/meitner-se/tolka#readme",
+    "bugs": {
+        "url": "https://github.com/meitner-se/tolka/issues"
     },
     "type": "module",
     "sideEffects": false,
