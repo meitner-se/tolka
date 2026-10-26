@@ -217,6 +217,23 @@ function Header() {
 the object you get back keeps its identity across renders and is safe in a
 dependency array.
 
+A component that knows it is showing a different axis than the one the user is
+on says so where it reads the copy:
+
+```tsx
+function PreviewCard() {
+    const { content } = useDictionary(dictionary, { tone: "formal" });
+    return <h1>{content.title}</h1>;
+}
+```
+
+The second argument is merged over the provider's state, so an axis you leave
+out keeps the value the provider gave it — the reason to prefer this over a
+second `DictionaryProvider`, which would replace the whole state and would have
+to restate the locale as well. Each distinct state is its own cache entry, so
+two components reading the same dictionary under different overrides do not
+collide.
+
 React is an optional peer dependency. The core never imports it.
 
 ## Outside React

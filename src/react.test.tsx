@@ -64,6 +64,29 @@ describe("useDictionary", () => {
         expect(render(<Title />, "en", "formal")).toBe("<p>Files</p>");
     });
 
+    it("takes an axis override for one read, over the provider's", () => {
+        function Title() {
+            const { content } = useDictionary(dictionary, { tone: "formal" });
+            return <p>{content.title}</p>;
+        }
+        expect(render(<Title />, "sv", "casual")).toBe("<p>Dokument</p>");
+    });
+
+    it("keeps two overrides of one dictionary apart", () => {
+        // The resolution cache is keyed on the merged state, not the
+        // provider's, so a second override must not be served the first's copy.
+        function Pair() {
+            const casual = useDictionary(dictionary, { tone: "casual" });
+            const formal = useDictionary(dictionary, { tone: "formal" });
+            return (
+                <p>
+                    {casual.content.title}/{formal.content.title}
+                </p>
+            );
+        }
+        expect(render(<Pair />, "sv", "formal")).toBe("<p>Filer/Dokument</p>");
+    });
+
     it("renders rich text without React's missing-key warning", () => {
         // The symptom this subpath exists to remove: `format` returns an array
         // as soon as a tag renderer yields an element, and a bare array warns.
