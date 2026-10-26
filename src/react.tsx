@@ -149,7 +149,15 @@ export type UseDictionaryOf<
         ChainGuard<L, R, E> &
         ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
             ? unknown
-            : never)
+            : never),
+    /**
+     * Axis values for this read alone, merged over the provider's. A component
+     * that knows it is showing another axis says so where it reads the copy,
+     * rather than wrapping itself in a second provider — which would also have
+     * to restate the locale, and would replace the whole state rather than the
+     * one axis it means to change.
+     */
+    state?: Partial<StateFromPlugins<P>>
 ) => { content: Resolved<Extended<C, E>, D> };
 
 export interface ReactBindings<
@@ -221,7 +229,8 @@ export function createReactBindings<
             ChainGuard<L, R, E> &
             ([TagsUsed<Extended<C, E>>] extends [P[number]["tag"]]
                 ? unknown
-                : never)
+                : never),
+        state?: Partial<State>
     ): { content: Resolved<Extended<C, E>, D> } {
         const axes = useContext(Context);
         if (!axes) {
@@ -230,7 +239,11 @@ export function createReactBindings<
             );
         }
 
-        const key = `${axes.locale}\u0000${stateKey(axes.state)}`;
+        const resolvedState: State = state
+            ? { ...axes.state, ...state }
+            : axes.state;
+
+        const key = `${axes.locale}\u0000${stateKey(resolvedState)}`;
         let byAxes = cache.get(dictionary);
         if (!byAxes) {
             byAxes = new Map();
@@ -247,7 +260,7 @@ export function createReactBindings<
         // render.
         const resolved = tolka.resolveDictionary(dictionary, {
             locale: axes.locale,
-            state: axes.state,
+            state: resolvedState,
         });
         const result: ResolvedContent = {
             content: wrapFormatters(resolved.content),
