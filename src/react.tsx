@@ -160,6 +160,14 @@ export type UseDictionaryOf<
     state?: Partial<StateFromPlugins<P>>
 ) => { content: Resolved<Extended<C, E>, D> };
 
+/**
+ * The locale the provider is on, narrowed to the instance's own union rather
+ * than `string`. An app that carries its locale as a plain string has already
+ * narrowed it once to mount the provider; reading it back here means not
+ * narrowing it again at every site that formats a date or a number.
+ */
+export type UseLocaleOf<L extends string> = () => L;
+
 export interface ReactBindings<
     L extends string,
     R extends L,
@@ -168,6 +176,7 @@ export interface ReactBindings<
 > {
     DictionaryProvider: DictionaryProviderOf<L, P>;
     useDictionary: UseDictionaryOf<L, R, D, P>;
+    useLocale: UseLocaleOf<L>;
 }
 
 export function createReactBindings<
@@ -269,5 +278,16 @@ export function createReactBindings<
         return asResolved<Extended<C, E>>(result);
     }
 
-    return { DictionaryProvider, useDictionary };
+    function useLocale(): L {
+        const axes = useContext(Context);
+        if (!axes) {
+            throw new Error(
+                "tolka: useLocale was called outside its DictionaryProvider"
+            );
+        }
+
+        return axes.locale;
+    }
+
+    return { DictionaryProvider, useDictionary, useLocale };
 }
