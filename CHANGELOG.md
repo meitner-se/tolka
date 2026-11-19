@@ -1,5 +1,11 @@
 # @meitner/tolka
 
+## 0.5.0
+
+### Minor Changes
+
+- [#7](https://github.com/meitner-se/tolka/pull/7) [`83d75c8`](https://github.com/meitner-se/tolka/commit/83d75c8eb17c4519d71455c3b65d7e44b308c554) Thanks [@MattisAbrahamsson](https://github.com/MattisAbrahamsson)! - `createReactBindings` now also returns `useLocale`, which reads the locale the `DictionaryProvider` is on and types it as the instance's own locales rather than `string`. An app that narrows a plain string once to mount the provider can read it back narrowed everywhere it formats a date, a number or a list, instead of narrowing again at each site or keeping a second locale context beside the provider. Like `useDictionary` it throws outside the provider rather than falling back to a default, and a per-read axis override does not affect it.
+
 ## 0.4.0
 
 ### Minor Changes
