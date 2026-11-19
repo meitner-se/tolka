@@ -193,7 +193,8 @@ Bind once, then use the hook:
 import { createReactBindings } from "@meitner/tolka/react";
 import { tolka } from "./intl";
 
-export const { DictionaryProvider, useDictionary } = createReactBindings(tolka);
+export const { DictionaryProvider, useDictionary, useLocale } =
+    createReactBindings(tolka);
 ```
 
 ```tsx
@@ -233,6 +234,25 @@ second `DictionaryProvider`, which would replace the whole state and would have
 to restate the locale as well. Each distinct state is its own cache entry, so
 two components reading the same dictionary under different overrides do not
 collide.
+
+`useLocale` returns the locale the provider is on, typed as the instance's own
+locales rather than `string`:
+
+```tsx
+function Timestamp({ at }: { at: Date }) {
+    const locale = useLocale(); // "sv" | "en"
+    return <time>{at.toLocaleDateString(locale)}</time>;
+}
+```
+
+It is for code that formats rather than translates — dates, numbers, lists,
+collation. Copy comes from `useDictionary`, which reads the same locale itself,
+so reaching for `useLocale` to pick a string by hand is a sign the string wants
+to be a dictionary entry. A per-read axis override does not change what
+`useLocale` returns: overrides apply to plugin axes, not to the locale.
+
+Both hooks throw when called outside the provider, rather than falling back to
+a default locale, so a subtree mounted without one fails where the mistake is.
 
 React is an optional peer dependency. The core never imports it.
 

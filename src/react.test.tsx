@@ -25,7 +25,8 @@ const tolka = createTolka({
     onError: () => {},
 });
 
-const { DictionaryProvider, useDictionary } = createReactBindings(tolka);
+const { DictionaryProvider, useDictionary, useLocale } =
+    createReactBindings(tolka);
 
 const dictionary = tolka.createDictionary({
     content: {
@@ -116,6 +117,32 @@ describe("useDictionary", () => {
             return <p>{content.title}</p>;
         }
         expect(() => renderToStaticMarkup(<Orphan />)).toThrow(
+            /outside its DictionaryProvider/
+        );
+    });
+});
+
+describe("useLocale", () => {
+    function Current() {
+        const locale = useLocale();
+        return <p>{locale}</p>;
+    }
+
+    it("reads the provider's locale", () => {
+        expect(render(<Current />, "en", "casual")).toBe("<p>en</p>");
+        expect(render(<Current />, "sv", "casual")).toBe("<p>sv</p>");
+    });
+
+    it("is unaffected by a per-read axis override", () => {
+        function Overriding() {
+            useDictionary(dictionary, { tone: "formal" });
+            return <Current />;
+        }
+        expect(render(<Overriding />, "en", "casual")).toBe("<p>en</p>");
+    });
+
+    it("throws a useful error outside its provider", () => {
+        expect(() => renderToStaticMarkup(<Current />)).toThrow(
             /outside its DictionaryProvider/
         );
     });
